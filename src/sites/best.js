@@ -166,12 +166,13 @@ function pickBestSource(sourcesJson) {
   return best;
 }
 
-async function resolvePlayback(detail, detailUrl, h) {
-  let sources;
+async function resolvePlayback(site, detail, detailUrl, h) {
+  const step = (name) => { throw new Error('step:' + name); };
   try {
-    sources = rc4Decrypt(detail.videoId, detail.encodedSources, '_0x58fe15');
-  } catch {
-    return null;
+    var sources = rc4Decrypt(detail.videoId, detail.encodedSources, '_0x58fe15');
+  } catch (e) {
+    if (e?.message?.startsWith('step:')) throw e;
+    throw new Error('rc4-sources failed');
   }
   let playJson;
   try {
@@ -191,52 +192,53 @@ async function resolvePlayback(detail, detailUrl, h) {
       },
     );
     playJson = JSON.parse(playText);
-  } catch {
-    return null;
+  } catch (e) {
+    if (e?.message?.startsWith('step:')) throw e;
+    throw new Error('api-play failed: ' + (e?.message || e));
   }
-  if (!playJson || !playJson.status || !playJson.data) return null;
+  if (!playJson || !playJson.status || !playJson.data) throw new Error('api-play bad response');
   let playerUrl;
   try {
     playerUrl = rc4Decrypt(detail.videoId, playJson.data, '_0x58fe15').trim();
     if (playerUrl.startsWith('//')) playerUrl = 'https:' + playerUrl;
-  } catch {
-    return null;
+  } catch (e) {
+    throw new Error('rc4-player failed: ' + (e?.message || e));
   }
-  if (!/^https:\/\/[^"']+$/.test(playerUrl)) return null;
+  if (!/^https:\/\/[^"']+$/.test(playerUrl)) throw new Error('player-url invalid');
   let playerHtml;
   try {
     playerHtml = await h.upstream(site, playerUrl, { referer: detailUrl, allowHtml: true });
-  } catch {
-    return null;
+  } catch (e) {
+    throw new Error('player-html failed: ' + (e?.message || e));
   }
   const configM = playerHtml.match(/id="jwplayer"[^>]*data-config="([^"]+)"/);
-  if (!configM) return null;
+  if (!configM) throw new Error('no jwplayer config');
   const urlObj = new URL(playerUrl);
   const pathAndQuery = urlObj.pathname + (urlObj.search || '');
   const key = b64encodeStr(pathAndQuery).substring(4, 20);
   let configJson;
   try {
     configJson = rc4Decrypt(key, configM[1], '_0x59a0e4');
-  } catch {
-    return null;
+  } catch (e) {
+    throw new Error('rc4-config failed: ' + (e?.message || e));
   }
   let config;
   try {
     config = JSON.parse(configJson);
-  } catch {
-    return null;
+  } catch (e) {
+    throw new Error('config-parse failed: ' + (e?.message || e));
   }
   const srcB64 = String(config.src || '').trim();
-  if (!srcB64) return null;
+  if (!srcB64) throw new Error('no config.src');
   let sourcesList;
   try {
     const decoded = new TextDecoder().decode(b64decodeStr(srcB64));
     sourcesList = JSON.parse(decoded);
-  } catch {
-    return null;
+  } catch (e) {
+    throw new Error('sources-decode failed: ' + (e?.message || e));
   }
   const chosen = pickBestSource(Array.isArray(sourcesList) ? sourcesList : []);
-  if (!chosen) return null;
+  if (!chosen) throw new Error('no chosen source');
   let playUrl = chosen.file;
   try {
     const host = new URL(chosen.file).hostname;
@@ -283,7 +285,7 @@ async function post(site, url, h) {
   let poster = null;
   let dbg = null;
   try {
-    const playback = await resolvePlayback(info, detailUrl, h);
+    const playback = await resolvePlayback(site, info, detailUrl, h);
     if (playback) {
       playUrl = playback.playUrl;
       poster = playback.poster;
