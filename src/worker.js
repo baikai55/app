@@ -148,7 +148,7 @@ async function handlePost(site, url) {
 
   const parsed = parse.parseVideoDetails(site, html, detailUrl);
   const meta = parsePageMeta(html, detailUrl, videoId);
-  const ctx = { fetch, ua: UA, baseUrl: site.baseUrl, videoId, parsed: parsed || undefined };
+  const ctx = { fetch: (u, o) => fetch(u, o), ua: UA, baseUrl: site.baseUrl, videoId, parsed: parsed || undefined };
   const playback = await resolvePlayback(site, ctx);
   if (!playback.playUrl) throw new Error('播放地址暂时不可用');
   return json({
@@ -181,7 +181,7 @@ function parsePageMeta(html, detailUrl, videoId) {
 async function handlePlay(site, url) {
   const id = url.pathname.split('/').filter(Boolean).pop()?.replace(/\.m3u8$/, '');
   if (!id || !/^\d+$/.test(id)) return json({ ok: false, error: '参数无效' }, 400);
-  const ctx = { fetch, ua: UA, baseUrl: site.baseUrl, videoId: id };
+  const ctx = { fetch: (u, o) => fetch(u, o), ua: UA, baseUrl: site.baseUrl, videoId: id };
   if (site.playback === 'avjb-rebuild') {
     const segmentCount = await avjb.resolveSegmentCount(ctx, id);
     if (!segmentCount) return json({ ok: false, error: '未找到可用分片' }, 404);
