@@ -2,6 +2,7 @@
 
 const UPSTREAM = 'https://www.bestjavporn.com';
 const PROXY_DOMAINS = ['pianopic.com', 'streamhls.click'];
+const BEST_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 function clean(s) {
   return String(s ?? '')
@@ -187,6 +188,7 @@ async function resolvePlayback(site, detail, detailUrl, h) {
           Origin: UPSTREAM,
           'X-Requested-With': 'XMLHttpRequest',
           'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': BEST_UA,
         },
         allowHtml: true,
       },
@@ -207,7 +209,7 @@ async function resolvePlayback(site, detail, detailUrl, h) {
   if (!/^https:\/\/[^"']+$/.test(playerUrl)) throw new Error('player-url invalid');
   let playerHtml;
   try {
-    playerHtml = await h.upstream(site, playerUrl, { referer: detailUrl, allowHtml: true });
+    playerHtml = await h.upstream(site, playerUrl, { referer: detailUrl, allowHtml: true, headers: { 'User-Agent': BEST_UA } });
   } catch (e) {
     throw new Error('player-html failed: ' + (e?.message || e));
   }
