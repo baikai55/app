@@ -4,18 +4,27 @@ import { SITES, findSite } from './lib/catalog.js';
 import * as parse from './lib/parse.js';
 import * as avjb from './lib/avjb.js';
 import * as dom from './lib/dom.js';
+import * as kan91 from './sites/kan91.js';
+import * as mr from './sites/mr.js';
+import * as tx from './sites/tx.js';
+import * as rou from './sites/rou.js';
+import * as best from './sites/best.js';
+import * as madouai from './sites/madouai.js';
+import * as madou from './sites/madou.js';
+
+const SITE_MODULES = { kan91, mr, tx, rou, best, madouai, madou };
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
-const json = (data, status = 200) =>
+const json = (data, status = 200, cache = 'no-store') =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': cache },
   });
 
 const htmlHeaders = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' };
 
-async function upstream(site, url, { method = 'GET', headers = {} } = {}) {
+async function upstream(site, url, { method = 'GET', headers = {}, referer, allowHtml = false } = {}) {
   const res = await fetch(url, {
     method,
     redirect: 'follow',
@@ -23,13 +32,13 @@ async function upstream(site, url, { method = 'GET', headers = {} } = {}) {
       'User-Agent': UA,
       Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
       'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.7',
-      Referer: site.baseUrl,
+      Referer: referer || site.baseUrl,
       ...headers,
     },
   });
   if (!res.ok) throw new Error(`上游源站响应异常 (${res.status})`);
   const contentType = (res.headers.get('content-type') || '').toLowerCase();
-  if (/^(image|audio|video)\//.test(contentType) && !/mpegurl|x-mpegurl|vnd\.apple\.mpegurl/.test(contentType)) {
+  if (!allowHtml && /^(image|audio|video)\//.test(contentType) && !/mpegurl|x-mpegurl|vnd\.apple\.mpegurl/.test(contentType)) {
     throw new Error('上游返回了非文本内容');
   }
   const buf = await res.arrayBuffer();
@@ -39,6 +48,11 @@ async function upstream(site, url, { method = 'GET', headers = {} } = {}) {
     const enc = site.encoding && site.encoding !== 'utf-8' ? site.encoding : 'gbk';
     return new TextDecoder(enc).decode(buf);
   }
+}
+
+function moduleFor(site) {
+  if (!site.module) return null;
+  return SITE_MODULES[site.module] || null;
 }
 
 function buildListUrl(site, feed, page) {
@@ -65,7 +79,21 @@ async function handleMeta() {
   });
 }
 
+function moduleContext(site) {
+  return {
+    fetch: (u, o) => fetch(u, o),
+    ua: UA,
+    baseUrl: site.baseUrl,
+    upstream,
+    json,
+  };
+}
+
 async function handlePosts(site, url) {
+  const mod = moduleFor(site);
+  if (mod && typeof mod.posts === 'function') {
+    return mod.posts(site, url, moduleContext(site));
+  }
   const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
   const feedId = url.searchParams.get('feed') || site.feeds[0].id;
   const feed = site.feeds.find((f) => f.id === feedId) || site.feeds[0];
@@ -118,6 +146,10 @@ async function findAvjbDetailUrl(site, videoId) {
 }
 
 async function handlePost(site, url) {
+  const mod = moduleFor(site);
+  if (mod && typeof mod.post === 'function') {
+    return mod.post(site, url, moduleContext(site));
+  }
   const segments = url.pathname.split('/').filter(Boolean);
   const rawId = decodeURIComponent(segments[segments.length - 1] || '');
   const marker = site.contentId.marker || 'video';
@@ -278,6 +310,21 @@ export default {
       } catch (error) {
         return json({ error: error.message || '服务暂时不可用' }, 502);
       }
+    }
+
+    const moduleRoute = path.match(/^\/api\/([a-z0-9-]+)\/(play|image|proxy|key)(?:\/|$)/);
+    if (moduleRoute && !moduleRoute[2].includes('/')) {
+      const site = findSite(moduleRoute[1]);
+      if (!site) return json({ error: '未知站点' }, 404);
+      const mod = moduleFor(site);
+      if (mod && typeof mod[moduleRoute[2]] === 'function') {
+        try {
+          return await mod[moduleRoute[2]](site, url, moduleContext(site));
+        } catch (error) {
+          return json({ error: error.message || '服务暂时不可用' }, 502);
+        }
+      }
+      return json({ error: '该站点不支持此接口' }, 400);
     }
 
     if (path === '/health') return json({ ok: true });

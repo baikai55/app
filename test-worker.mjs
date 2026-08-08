@@ -40,3 +40,34 @@ if (jaPlay.ct.includes('vnd.apple.mpegurl')) {
   const lines = jaPlay.body.split('\n').filter(Boolean);
   console.log('  playlist: extinf lines=', lines.filter(l => l.startsWith('#EXTINF')).length, 'firstSeg=', lines.find(l => !l.startsWith('#')), 'lastSeg=', lines.filter(l => !l.startsWith('#')).pop());
 }
+await call('/api/kan91/posts');
+await call('/api/mr/posts');
+await call('/api/tx/posts');
+await call('/api/rou/posts');
+await call('/api/best/posts');
+await call('/api/madouai/posts');
+await call('/api/madou/posts');
+await call('/api/madou/posts?feed=麻豆传媒');
+const k91 = await call('/api/kan91/post/387986');
+const mrD = await call('/api/mr/post/187506');
+const txD = await call('/api/tx/post/9ffe9878ee');
+const rouD = await call('/api/rou/post/cmsj6kyo10000s63fmh6xdhmy');
+const mdD = await call('/api/madouai/post/16950');
+const mD = await call('/api/madou/post/巨乳痴女主观镜头-淫语射精joi.html');
+console.log('kan91 playUrl:', k91.body?.post?.playUrl);
+console.log('mr playUrl:', mrD.body?.post?.videos?.[0]?.playUrl);
+console.log('tx playUrl:', txD.body?.post?.playUrl);
+console.log('rou playUrl:', rouD.body?.post?.playUrl);
+console.log('madouai playUrl:', mdD.body?.post?.playUrl);
+console.log('madou playUrl:', mD.body?.post?.playUrl);
+const k91p = await call('/api/kan91/play?id=387986');
+const mrP = await call('/api/mr/play?url=' + encodeURIComponent(mrD.body.post.videos[0].playUrl));
+const txP = await call('/api/tx/play?vid=35016');
+const rouP = await call('/api/rou/play?id=cmsj6kyo10000s63fmh6xdhmy');
+const mdP = await call('/api/madouai/play?path=' + encodeURIComponent('jpd/20251217/4t/lo/4w/kx/f9ffdeb803f24ea0844b053c02b2bb94.m3u8'));
+const mP = await call('/api/madou/play?id=68ff2021d2f708714780a8c1');
+for (const [name, res] of [['kan91', k91p], ['mr', mrP], ['tx', txP], ['rou', rouP], ['madouai', mdP], ['madou', mP]]) {
+  const text = res.body;
+  const lines = String(text).split('\n');
+  console.log(name, 'playlist extinf:', lines.filter(l => l.startsWith('#EXTINF')).length, 'firstSeg:', lines.find(l => !l.startsWith('#')), 'keyLine:', lines.find(l => l.startsWith('#EXT-X-KEY')));
+}
