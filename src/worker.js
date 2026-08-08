@@ -80,7 +80,7 @@ async function resolvePlayback(site, ctx) {
     const videoId = ctx.videoId;
     const segmentCount = await avjb.resolveSegmentCount(ctx, videoId);
     if (segmentCount && segmentCount > 0) {
-      return { playUrl: `/api/play/${site.id}/${videoId}.m3u8`, isHls: true, rebuilt: segmentCount };
+      return { playUrl: `/api/${site.id}/play/${videoId}.m3u8`, isHls: true, rebuilt: segmentCount };
     }
     const embedUrl = new URL(`/newembed/${videoId}`, site.baseUrl).toString();
     try {
