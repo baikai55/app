@@ -147,8 +147,9 @@ async function play(site, url, h) {
       }
       return line;
     }
+    if (/^https?:\/\//i.test(line)) return line;
     const abs = new URL(line, UPSTREAM + '/').toString();
-    return '/api/madouai/play?path=' + encodeURIComponent(abs);
+    return abs;
   });
   return new Response(lines.join('\n'), {
     status: 200,
