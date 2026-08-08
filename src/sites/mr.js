@@ -1,6 +1,7 @@
 'use strict';
 
 const UPSTREAM = 'https://www.mrds66.com';
+import { decryptImageBytes } from '../lib/decrypt.js';
 
 function clean(s) {
   return String(s ?? '')
@@ -181,11 +182,13 @@ async function image(site, url, h) {
   }
   if (!res.ok) return h.json({ ok: false, error: '上游 ' + res.status }, 502);
   const bytes = new Uint8Array(await res.arrayBuffer());
+  const decrypted = await decryptImageBytes(bytes);
+  const out = decrypted && decrypted.length > 0 && decrypted[0] === 0xff && decrypted[1] === 0xd8 ? decrypted : bytes;
   let mime = 'image/jpeg';
-  if (bytes[0] === 0x89 && bytes[1] === 0x50) mime = 'image/png';
-  else if (bytes[0] === 0x52 && bytes[1] === 0x49) mime = 'image/webp';
-  else if (bytes[0] === 0x47 && bytes[1] === 0x49) mime = 'image/gif';
-  return new Response(bytes, {
+  if (out[0] === 0x89 && out[1] === 0x50) mime = 'image/png';
+  else if (out[0] === 0x52 && out[1] === 0x49) mime = 'image/webp';
+  else if (out[0] === 0x47 && out[1] === 0x49) mime = 'image/gif';
+  return new Response(out, {
     status: 200,
     headers: {
       'Content-Type': mime,
