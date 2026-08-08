@@ -177,25 +177,23 @@ async function resolvePlayback(site, detail, detailUrl, h) {
   }
   let playJson;
   try {
-    const playText = await h.upstream(
-      site,
-      `${UPSTREAM}/api/play/`,
-      {
-        referer: detailUrl,
-        method: 'POST',
-        body: `sources=${encodeURIComponent(sources)}&ver=${detail.videoVersion}`,
-        headers: {
-          Origin: UPSTREAM,
-          'X-Requested-With': 'XMLHttpRequest',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': BEST_UA,
-        },
-        allowHtml: true,
+    const res = await fetch(`${UPSTREAM}/api/play/`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': BEST_UA,
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        Accept: 'text/html,application/xhtml+xml',
+        Referer: detailUrl,
+        Origin: UPSTREAM,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-    );
+      body: `sources=${encodeURIComponent(sources)}&ver=${detail.videoVersion}`,
+    });
+    if (!res.ok) throw new Error('api-play status ' + res.status + ' body=' + (await res.text()).slice(0, 200));
+    const playText = await res.text();
     playJson = JSON.parse(playText);
   } catch (e) {
-    if (e?.message?.startsWith('step:')) throw e;
     throw new Error('api-play failed: ' + (e?.message || e));
   }
   if (!playJson || !playJson.status || !playJson.data) throw new Error('api-play bad response');
