@@ -202,6 +202,52 @@ async function handlePlay(site, url) {
   return json({ ok: false, error: '该站点无需代理播放' }, 400);
 }
 
+const COVER_HOSTS = ['bmc.imgclh.com', 'bmc2.imgclh.com', 'bmc3.imgclh.com'];
+
+async function handleCover(request) {
+  const target = new URL(request.url).searchParams.get('url') || '';
+  let cover;
+  try {
+    cover = new URL(target);
+  } catch {
+    return json({ error: '参数无效' }, 400);
+  }
+  if (!COVER_HOSTS.includes(cover.host)) return json({ error: '来源不允许' }, 403);
+  const base = cover.pathname.replace(/\/[^/]+\.jpg$/, '');
+  const candidates = ['4.jpg', '1.jpg', '2.jpg', '3.jpg', '5.jpg', '6.jpg', 'preview.jpg'];
+  const name = cover.pathname.split('/').pop() || '';
+  const names = [name, ...candidates.filter((n) => n !== name)];
+  for (const candidate of names) {
+    try {
+      const res = await fetch(new URL(base + '/' + candidate, cover).toString(), {
+        method: 'GET',
+        headers: { 'User-Agent': UA, Accept: 'image/*' },
+      });
+      if (!res.ok) continue;
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (!ct.startsWith('image/')) continue;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      const looksImage =
+        (bytes[0] === 0xff && bytes[1] === 0xd8) || // jpeg
+        (bytes[0] === 0x89 && bytes[1] === 0x50) || // png
+        (bytes[0] === 0x52 && bytes[1] === 0x49) || // webp RIFF
+        (bytes[0] === 0x47 && bytes[1] === 0x49); // gif
+      if (!looksImage) continue;
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          'Content-Type': ct,
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=86400',
+        },
+      });
+    } catch {
+      // try next
+    }
+  }
+  return json({ error: '封面不可用' }, 404);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -212,6 +258,14 @@ export default {
     }
 
     if (path === '/api/meta') return handleMeta();
+
+    if (path === '/api/cover') {
+      try {
+        return await handleCover(request);
+      } catch (error) {
+        return json({ error: error.message || '封面不可用' }, 502);
+      }
+    }
 
     const siteMatch = path.match(/^\/api\/([a-z0-9-]+)\/(posts|post\/[^/]+|play\/[^/]+)/);
     if (siteMatch) {
