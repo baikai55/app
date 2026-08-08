@@ -32,8 +32,13 @@ async function upstream(site, url, { method = 'GET', headers = {} } = {}) {
   if (/^(image|audio|video)\//.test(contentType) && !/mpegurl|x-mpegurl|vnd\.apple\.mpegurl/.test(contentType)) {
     throw new Error('上游返回了非文本内容');
   }
-  const body = await res.text();
-  return body;
+  const buf = await res.arrayBuffer();
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    const enc = site.encoding && site.encoding !== 'utf-8' ? site.encoding : 'gbk';
+    return new TextDecoder(enc).decode(buf);
+  }
 }
 
 function buildListUrl(site, feed, page) {

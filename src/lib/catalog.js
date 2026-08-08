@@ -6,6 +6,7 @@ const SITES = [
     name: '看JavBus',
     tagline: 'JavBus 内容浏览入口',
     baseUrl: 'https://avjb.com/',
+    encoding: 'gbk',
     contentId: { type: 'path', marker: 'video', offset: 1, pattern: '^\\d+$' },
     feeds: [
       { id: 'home', name: '首页', path: '/', isHome: true },
