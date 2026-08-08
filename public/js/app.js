@@ -184,7 +184,7 @@
   }
 
   function feedNavHTML(site, activeFeedId) {
-    const feeds = site.feeds || [];
+    const feeds = site?.feeds || [];
     if (!feeds.length) return '';
     return `<nav class="quick-categories" aria-label="频道分类">${feeds.map((feed) => `
       <a class="nav-item${feed.id === activeFeedId ? ' active' : ''}" href="#/${encodeURIComponent(site.id)}/category/${encodeURIComponent(feed.id)}" data-link>${esc(feed.name)}</a>`).join('')}</nav>`;
