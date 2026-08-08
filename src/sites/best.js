@@ -336,19 +336,27 @@ async function proxy(site, url, h) {
       return h.json({ ok: false, error: '上游读取失败' }, 502);
     }
     const base = target.href;
-    const lines = text.split(/\r?\n/).map((line) => {
+    const rawLines = text.split(/\r?\n/);
+    const out = [];
+    for (const line of rawLines) {
       if (!line || line.startsWith('#')) {
         const keyM = line.match(/^#EXT-X-KEY:[^"]*URI="([^"]+)"/);
         if (keyM) {
           const abs = new URL(keyM[1].replace(/\\\//g, '/'), base).href;
-          return line.replace(keyM[1], '/api/best/proxy?url=' + encodeURIComponent(abs));
+          out.push(line.replace(keyM[1], '/api/best/proxy?url=' + encodeURIComponent(abs)));
+        } else {
+          out.push(line);
         }
-        return line;
+        continue;
       }
       const abs = new URL(line.replace(/\\\//g, '/'), base).href;
-      return '/api/best/proxy?url=' + encodeURIComponent(abs);
-    });
-    return new Response(lines.join('\n'), {
+      if (/tiktokcdn\.com/i.test(abs)) {
+        while (out.length && out[out.length - 1].startsWith('#')) out.pop();
+        continue;
+      }
+      out.push('/api/best/proxy?url=' + encodeURIComponent(abs));
+    }
+    return new Response(out.join('\n'), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.apple.mpegurl; charset=utf-8',
