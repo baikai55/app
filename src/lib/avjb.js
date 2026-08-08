@@ -53,4 +53,4 @@ function buildPlaylist(videoId, segmentCount) {
   return lines.join('\n');
 }
 
-module.exports = { resolveSegmentCount, buildPlaylist, segmentUrl };
+export { resolveSegmentCount, buildPlaylist, segmentUrl };
