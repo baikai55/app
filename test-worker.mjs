@@ -71,3 +71,26 @@ for (const [name, res] of [['kan91', k91p], ['mr', mrP], ['tx', txP], ['rou', ro
   const lines = String(text).split('\n');
   console.log(name, 'playlist extinf:', lines.filter(l => l.startsWith('#EXTINF')).length, 'firstSeg:', lines.find(l => !l.startsWith('#')), 'keyLine:', lines.find(l => l.startsWith('#EXT-X-KEY')));
 }
+
+// image cover checks
+console.log('--- cover urls ---');
+console.log('kan91 cover:', k91.body?.post?.posts?.length ? '(list)' : '', k91.body?.post?.coverUrl);
+const k91List = (await call('/api/kan91/posts')).body;
+console.log('kan91 list cover0:', k91List.posts?.[0]?.coverUrl);
+const mrList = (await call('/api/mr/posts')).body;
+console.log('mr list cover0:', mrList.posts?.[0]?.coverUrl);
+const txList = (await call('/api/tx/posts')).body;
+console.log('tx list cover0:', txList.posts?.[0]?.coverUrl);
+const mdList = (await call('/api/madouai/posts')).body;
+console.log('madouai list cover0:', mdList.posts?.[0]?.coverUrl);
+
+async function imgProbe(url) {
+  const req = new Request(url, { method: 'GET' });
+  const res = await handler(req, { ASSETS });
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  console.log(url.split('?')[0], '->', res.status, res.headers.get('content-type'), 'len:', bytes.length);
+}
+if (k91List.posts?.[0]?.coverUrl) await imgProbe('https://app-hub.test-fbc.workers.dev' + k91List.posts[0].coverUrl);
+if (mrList.posts?.[0]?.coverUrl) await imgProbe('https://app-hub.test-fbc.workers.dev' + mrList.posts[0].coverUrl);
+if (txList.posts?.[0]?.coverUrl) await imgProbe('https://app-hub.test-fbc.workers.dev' + txList.posts[0].coverUrl);
+if (mdList.posts?.[0]?.coverUrl) await imgProbe('https://app-hub.test-fbc.workers.dev' + mdList.posts[0].coverUrl);

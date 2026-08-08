@@ -54,7 +54,7 @@ function parseCards(html) {
     const durM = block.match(/text-sm opacity-50[^>]*>\s*([^<]+?)\s*<\/div>/);
     const duration = durM ? durM[1].trim() : null;
     seen.add(id);
-    out.push({ id, title, duration, coverUrl: cover });
+    out.push({ id, title, duration, coverUrl: normalizeCover(cover) });
   }
   return out;
 }
@@ -95,6 +95,42 @@ function parseDetail(html) {
     tags,
     videoId,
   };
+}
+
+function normalizeCover(cover) {
+  if (!cover) return null;
+  return `/api/kan91/image?url=${encodeURIComponent(cover)}`;
+}
+
+async function image(site, url, h) {
+  const targetRaw = url.searchParams.get('url') || '';
+  if (!/^https:\/\//.test(targetRaw)) return h.json({ ok: false, error: '地址无效' }, 400);
+  let target;
+  try {
+    target = new URL(targetRaw);
+  } catch {
+    return h.json({ ok: false, error: '地址无效' }, 400);
+  }
+  let res;
+  try {
+    res = await fetch(target.toString(), { headers: { 'User-Agent': h.ua, Referer: UPSTREAM + '/' } });
+  } catch {
+    return h.json({ ok: false, error: '上游不可达' }, 502);
+  }
+  if (!res.ok) return h.json({ ok: false, error: '上游 ' + res.status }, 502);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  let mime = 'image/jpeg';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50) mime = 'image/png';
+  else if (bytes[0] === 0x52 && bytes[1] === 0x49) mime = 'image/webp';
+  else if (bytes[0] === 0x47 && bytes[1] === 0x49) mime = 'image/gif';
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      'Content-Type': mime,
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'public, max-age=86400',
+    },
+  });
 }
 
 async function posts(site, url, h) {
@@ -144,7 +180,7 @@ async function post(site, url, h) {
       favorites: info.favorites,
       likes: info.likes,
       duration: info.duration,
-      coverUrl: info.coverUrl,
+      coverUrl: normalizeCover(info.coverUrl),
       tags: info.tags,
       playUrl,
       related,
@@ -240,4 +276,4 @@ async function play(site, url, h) {
   });
 }
 
-export { posts, post, play };
+export { posts, post, play, image };
