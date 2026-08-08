@@ -281,14 +281,17 @@ async function post(site, url, h) {
   if (!info) return h.json({ ok: false, error: '内容不存在' }, 404);
   let playUrl = null;
   let poster = null;
+  let dbg = null;
   try {
     const playback = await resolvePlayback(info, detailUrl, h);
     if (playback) {
       playUrl = playback.playUrl;
       poster = playback.poster;
+    } else {
+      dbg = 'resolvePlayback returned null';
     }
-  } catch {
-    // 播放地址获取失败时仍返回详情
+  } catch (e) {
+    dbg = 'resolvePlayback threw: ' + (e?.message || e);
   }
   const related = parseCards(html).filter((r) => r.slug !== id).slice(0, 12);
   return h.json({
@@ -307,6 +310,7 @@ async function post(site, url, h) {
       tags: [],
       playUrl,
       poster,
+      dbg,
       related,
     },
   }, 200, 'no-store');
