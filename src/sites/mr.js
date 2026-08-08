@@ -189,7 +189,14 @@ async function post(site, url, h) {
   const html = await h.upstream(site, `${UPSTREAM}/archives/${id}/`);
   const detail = parseDetail(html, id);
   if (!detail.title && !detail.videos.length) return h.json({ ok: false, error: '内容不存在' }, 404);
-  return h.json({ ok: true, post: detail }, 200, 'no-store');
+  const first = detail.videos[0] || null;
+  return h.json({
+    ok: true,
+    post: {
+      ...detail,
+      playUrl: first ? first.playUrl : null,
+    },
+  }, 200, 'no-store');
 }
 
 async function play(site, url, h) {
