@@ -168,12 +168,11 @@ function pickBestSource(sourcesJson) {
 }
 
 async function resolvePlayback(site, detail, detailUrl, h) {
-  const step = (name) => { throw new Error('step:' + name); };
+  let sources;
   try {
-    var sources = rc4Decrypt(detail.videoId, detail.encodedSources, '_0x58fe15');
+    sources = rc4Decrypt(detail.videoId, detail.encodedSources, '_0x58fe15');
   } catch (e) {
-    if (e?.message?.startsWith('step:')) throw e;
-    throw new Error('rc4-sources failed');
+    throw new Error('rc4-sources failed: ' + (e?.message || e));
   }
   let playJson;
   try {
@@ -283,17 +282,14 @@ async function post(site, url, h) {
   if (!info) return h.json({ ok: false, error: '内容不存在' }, 404);
   let playUrl = null;
   let poster = null;
-  let dbg = null;
   try {
     const playback = await resolvePlayback(site, info, detailUrl, h);
     if (playback) {
       playUrl = playback.playUrl;
       poster = playback.poster;
-    } else {
-      dbg = 'resolvePlayback returned null';
     }
-  } catch (e) {
-    dbg = 'resolvePlayback threw: ' + (e?.message || e);
+  } catch {
+    // 播放地址获取失败时仍返回详情
   }
   const related = parseCards(html).filter((r) => r.slug !== id).slice(0, 12);
   return h.json({
@@ -312,7 +308,6 @@ async function post(site, url, h) {
       tags: [],
       playUrl,
       poster,
-      dbg,
       related,
     },
   }, 200, 'no-store');
