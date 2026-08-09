@@ -347,7 +347,7 @@
       });
       state.art = art;
       const video = art.video;
-      const artContainer = art.template.$container || document.querySelector('#art-player');
+      const artContainer = document.querySelector('#art-player');
       if (artContainer) {
         const isControl = (e) => !!(e.target && e.target.closest && e.target.closest('.art-icon, .art-control, .art-contextmenu, .art-settings, .art-selector'));
         artContainer.addEventListener('click', (e) => {
@@ -363,7 +363,7 @@
           e.stopPropagation();
           e.stopImmediatePropagation();
           if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-          art.toggle();
+          if (video.paused) video.play().catch(() => {}); else video.pause();
         }, { capture: true });
         if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
           let lastTap = 0;
@@ -374,7 +374,7 @@
             if (now - lastTap < 350) {
               lastTap = 0;
               if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
-              art.toggle();
+              if (video.paused) video.play().catch(() => {}); else video.pause();
             } else {
               lastTap = now;
               if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
