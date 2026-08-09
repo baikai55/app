@@ -483,7 +483,9 @@ async function proxy(site, url, h) {
   const target = url.searchParams.get('url') || '';
   if (!/^https:\/\//.test(target)) return h.json({ ok: false, error: '地址无效' }, 400);
   const resp = await proxyFetch(target);
-  const ct = resp.headers.get('Content-Type') || 'video/mp2t';
+  const upstreamCt = resp.headers.get('Content-Type') || '';
+  const isTs = /\.ts($|\?)/i.test(new URL(target).pathname);
+  const ct = isTs ? 'video/mp2t' : upstreamCt || 'application/octet-stream';
   return new Response(resp.body, {
     status: resp.status,
     headers: {
