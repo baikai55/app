@@ -347,9 +347,10 @@
       });
       state.art = art;
       const video = art.video;
+      state.mediaEvents = new AbortController();
       const artContainer = document.querySelector('#art-player');
-      if (artContainer) {
-        const isControl = (e) => !!(e.target && e.target.closest && e.target.closest('.art-icon, .art-control, .art-contextmenu, .art-settings, .art-selector'));
+      if (artContainer) {        const isControl = (e) => !!(e.target && e.target.closest && e.target.closest('.art-icon, .art-control, .art-contextmenu, .art-settings, .art-selector'));
+        let suppressClick = false;
         artContainer.addEventListener('click', (e) => {
           if (isControl(e)) return;
           e.preventDefault();
@@ -400,6 +401,7 @@
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
+          if (suppressClick) return;
           onTap();
         }, { capture: true });
         artContainer.addEventListener('dblclick', (e) => {
@@ -414,6 +416,44 @@
             if (isControl(e)) return;
             onTap();
           }, { capture: true });
+        } else {
+          let drag = null;
+          const sig = state.mediaEvents?.signal;
+          const onMouseDown = (e) => {
+            if (isControl(e)) return;
+            if (e.button !== 0) return;
+            drag = { x: e.clientX, y: e.clientY, t: video.currentTime || 0, moved: false };
+          };
+          const onMouseMove = (e) => {
+            if (!drag) return;
+            const dx = e.clientX - drag.x;
+            const dy = e.clientY - drag.y;
+            if (!drag.moved) {
+              if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+              if (Math.abs(dx) < Math.abs(dy)) { drag = null; return; }
+              drag.moved = true;
+            }
+            e.preventDefault();
+            const width = artContainer.clientWidth || 1;
+            const delta = (dx / width) * (video.duration || 0);
+            const target = Math.max(0, Math.min(video.duration || 0, drag.t + delta));
+            video.currentTime = target;
+          };
+          const onMouseUp = (e) => {
+            if (drag && drag.moved) {
+              suppressClick = true;
+              setTimeout(() => { suppressClick = false; }, 400);
+            }
+            drag = null;
+          };
+          artContainer.addEventListener('mousedown', onMouseDown, { capture: true });
+          if (sig) {
+            window.addEventListener('mousemove', onMouseMove, { capture: true, signal: sig });
+            window.addEventListener('mouseup', onMouseUp, { capture: true, signal: sig });
+          } else {
+            window.addEventListener('mousemove', onMouseMove, { capture: true });
+            window.addEventListener('mouseup', onMouseUp, { capture: true });
+          }
         }
       }
       const ready = () => {
@@ -421,7 +461,6 @@
         state.playerTimer = null;
         playerFeedback('');
       };
-      state.mediaEvents = new AbortController();
       const options = { signal: state.mediaEvents.signal };
       video.addEventListener('loadstart', () => playerFeedback('正在加载'), options);
       video.addEventListener('loadedmetadata', ready, options);
