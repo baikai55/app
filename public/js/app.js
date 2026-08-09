@@ -363,21 +363,22 @@
           e.stopPropagation();
           e.stopImmediatePropagation();
           if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-          if (art.playing) art.pause(); else art.play();
+          if (video.paused) video.play().catch(() => {}); else video.pause();
         }, { capture: true });
         if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
           let lastTap = 0;
+          let tapped = false;
           artContainer.addEventListener('touchend', (e) => {
             if (isControl(e)) return;
             const now = Date.now();
             if (now - lastTap < 350) {
               lastTap = 0;
-              const wasPlaying = art.playing;
-              if (art.playing) art.pause(); else art.play();
-              console.log('__dbl playingBefore=', wasPlaying, 'pausedNow=', art.video.paused);
-              setTimeout(() => console.log('__dbl paused100=', art.video.paused, 'playing=', art.playing), 120);
+              if (tapped) { tapped = false; return; }
+              tapped = true;
+              if (video.paused) video.play().catch(() => {}); else video.pause();
             } else {
               lastTap = now;
+              tapped = false;
             }
           });
         }
