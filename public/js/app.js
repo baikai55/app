@@ -436,12 +436,6 @@
           e.stopImmediatePropagation();
           onDoubleFire();
         }, { capture: true });
-        if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
-          artContainer.addEventListener('touchend', (e) => {
-            if (isControl(e)) return;
-            onTap();
-          }, { capture: true });
-        }
         let drag = null;
         const sig = state.mediaEvents?.signal;
         const onMouseDown = (e) => {
