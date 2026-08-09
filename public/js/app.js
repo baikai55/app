@@ -372,7 +372,10 @@
             const now = Date.now();
             if (now - lastTap < 350) {
               lastTap = 0;
+              const wasPaused = video.paused;
               if (video.paused) video.play().catch(() => {}); else video.pause();
+              console.log('__tapDouble pausedBefore=', wasPaused, 'pausedNow=', video.paused);
+              setTimeout(() => console.log('__tapDouble pausedAfter100ms=', video.paused), 100);
             } else {
               lastTap = now;
             }
@@ -380,7 +383,7 @@
           artContainer.addEventListener('touchend', (e) => {
             const st = window.__tapState || (window.__tapState = { n: 0 });
             st.n++;
-            if (st.n <= 3) console.log('__tap', st.n, 'target=', e.target && e.target.tagName, 'cls=', e.target && e.target.className && String(e.target.className).slice(0, 30));
+            if (st.n <= 6) console.log('__tap', st.n, 'target=', e.target && e.target.tagName, 'cls=', e.target && e.target.className && String(e.target.className).slice(0, 30));
           });
         }
       }
