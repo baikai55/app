@@ -357,39 +357,63 @@
           e.stopImmediatePropagation();
         }, { capture: true });
         const togglePlay = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
+        const toggleControls = () => {
+          try { art.controls.show = !art.controls.show; } catch {}
+        };
         let lastTap = 0;
-        let tapHandled = false;
+        let singleTimer = null;
+        let doubleFired = false;
         let lastToggle = 0;
-        const safeToggle = () => {
+        const scheduleSingle = () => {
+          if (singleTimer) { clearTimeout(singleTimer); singleTimer = null; }
+          singleTimer = setTimeout(() => {
+            singleTimer = null;
+            if (doubleFired) { doubleFired = false; return; }
+            if (video.paused) {
+              video.play().catch(() => {});
+            } else {
+              toggleControls();
+            }
+          }, 320);
+        };
+        const onDoubleFire = () => {
+          if (singleTimer) { clearTimeout(singleTimer); singleTimer = null; }
+          doubleFired = true;
+          setTimeout(() => { doubleFired = false; }, 380);
           const now = Date.now();
           if (now - lastToggle < 450) return;
           lastToggle = now;
           togglePlay();
         };
-        const onTouchEnd = (e) => {
-          if (isControl(e)) return;
+        const onTap = () => {
           const now = Date.now();
           if (now - lastTap < 350) {
             lastTap = 0;
-            if (tapHandled) { tapHandled = false; return; }
-            tapHandled = true;
-            safeToggle();
+            onDoubleFire();
           } else {
             lastTap = now;
-            tapHandled = false;
+            scheduleSingle();
           }
         };
+        artContainer.addEventListener('click', (e) => {
+          if (isControl(e)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          onTap();
+        }, { capture: true });
         artContainer.addEventListener('dblclick', (e) => {
           if (isControl(e)) return;
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
-          lastTap = 0;
-          tapHandled = false;
-          safeToggle();
+          onDoubleFire();
         }, { capture: true });
         if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
-          artContainer.addEventListener('touchend', onTouchEnd, { capture: true });
+          artContainer.addEventListener('touchend', (e) => {
+            if (isControl(e)) return;
+            onTap();
+          }, { capture: true });
         }
       }
       const ready = () => {
