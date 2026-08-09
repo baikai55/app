@@ -349,18 +349,8 @@
       const video = art.video;
       state.mediaEvents = new AbortController();
       const artContainer = document.querySelector('#art-player');
-      if (artContainer) {        const isControl = (e) => !!(e.target && e.target.closest && e.target.closest('.art-control, .art-contextmenu, .art-settings, .art-selector, .art-progress, .art-bottom .art-controls'));
-        let suppressClick = false;
-        artContainer.addEventListener('click', (e) => {
-          if (isControl(e)) return;
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-        }, { capture: true });
-        const togglePlay = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
-        const toggleControls = () => {
-          try { art.controls.show = !art.controls.show; } catch {}
-        };
+      if (artContainer) {
+        const isControl = (e) => !!(e.target && e.target.closest && e.target.closest('.art-control, .art-contextmenu, .art-settings, .art-selector, .art-progress, .art-bottom .art-controls'));
         const fmtTime = (sec) => {
           if (!Number.isFinite(sec) || sec < 0) return '00:00';
           const h = Math.floor(sec / 3600);
@@ -376,97 +366,46 @@
         const clearSeekTime = () => {
           try { art.notice.show = ''; } catch {}
         };
-        let lastTap = 0;
-        let singleTimer = null;
-        let doubleFired = false;
-        let lastToggle = 0;
-        const scheduleSingle = () => {
-          if (singleTimer) { clearTimeout(singleTimer); singleTimer = null; }
-          singleTimer = setTimeout(() => {
-            singleTimer = null;
-            if (doubleFired) { doubleFired = false; return; }
-            if (video.paused) {
-              video.play().catch(() => {});
-            } else {
-              toggleControls();
-            }
-          }, 320);
-        };
-        const onDoubleFire = () => {
-          if (singleTimer) { clearTimeout(singleTimer); singleTimer = null; }
-          doubleFired = true;
-          setTimeout(() => { doubleFired = false; }, 380);
-          const now = Date.now();
-          if (now - lastToggle < 450) return;
-          lastToggle = now;
-          togglePlay();
-        };
-        const onTap = () => {
-          if (video.paused) {
-            video.play().catch(() => {});
-            return;
-          }
-          const now = Date.now();
-          if (now - lastTap < 350) {
-            lastTap = 0;
-            onDoubleFire();
-          } else {
-            lastTap = now;
-            scheduleSingle();
-          }
-        };
-        artContainer.addEventListener('click', (e) => {
-          if (isControl(e)) return;
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-        }, { capture: true });
-        artContainer.addEventListener('pointerup', (e) => {
-          if (isControl(e)) return;
-          if (suppressClick) return;
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          onTap();
-        }, { capture: true });
-        artContainer.addEventListener('dblclick', (e) => {
-          if (isControl(e)) return;
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          onDoubleFire();
-        }, { capture: true });
         let drag = null;
+        let suppressClick = false;
         const sig = state.mediaEvents?.signal;
         const onMouseDown = (e) => {
           if (isControl(e)) return;
           if (e.button !== 0) return;
           drag = { x: e.clientX, y: e.clientY, t: video.currentTime || 0, moved: false };
         };
-          const onMouseMove = (e) => {
-            if (!drag) return;
-            const dx = e.clientX - drag.x;
-            const dy = e.clientY - drag.y;
-            if (!drag.moved) {
-              if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-              if (Math.abs(dx) < Math.abs(dy)) { drag = null; return; }
-              drag.moved = true;
-            }
+        const onMouseMove = (e) => {
+          if (!drag) return;
+          const dx = e.clientX - drag.x;
+          const dy = e.clientY - drag.y;
+          if (!drag.moved) {
+            if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+            if (Math.abs(dx) < Math.abs(dy)) { drag = null; return; }
+            drag.moved = true;
+          }
+          e.preventDefault();
+          const width = artContainer.clientWidth || 1;
+          const delta = (dx / width) * (video.duration || 0);
+          const target = Math.max(0, Math.min(video.duration || 0, drag.t + delta));
+          video.currentTime = target;
+          showSeekTime(target);
+        };
+        const onMouseUp = (e) => {
+          if (drag && drag.moved) {
+            suppressClick = true;
+            setTimeout(() => { suppressClick = false; }, 400);
+            clearSeekTime();
+          }
+          drag = null;
+        };
+        const suppressClickHandler = (e) => {
+          if (suppressClick) {
             e.preventDefault();
-            const width = artContainer.clientWidth || 1;
-            const delta = (dx / width) * (video.duration || 0);
-            const target = Math.max(0, Math.min(video.duration || 0, drag.t + delta));
-            video.currentTime = target;
-            showSeekTime(target);
-          };
-          const onMouseUp = (e) => {
-            if (drag && drag.moved) {
-              suppressClick = true;
-              setTimeout(() => { suppressClick = false; }, 400);
-              clearSeekTime();
-            }
-            drag = null;
-          };
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          }
+        };
+        artContainer.addEventListener('click', suppressClickHandler, { capture: true });
         artContainer.addEventListener('mousedown', onMouseDown, { capture: true });
         if (sig) {
           window.addEventListener('mousemove', onMouseMove, { capture: true, signal: sig });
