@@ -1,0 +1,14 @@
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
+setGlobalDispatcher(new ProxyAgent('http://127.0.0.1:7890'));
+const base = 'https://ts10.hj260302818.top/hjstore/video/20260805/3143fc57a25842d93b713f0a51feca2f';
+const seed = base + '/13813945TFJI9xdG_i.jpg';
+const keyUrl = base + '/enc_13813945.key';
+globalThis.ASSETS = { async fetch(req) { return new Response('nf', { status: 404 }); } };
+const mod = await import('file:///H:/聚合/app-hub/src/worker.js');
+const handler = mod.default.fetch;
+const env = { ASSETS, HJ_TOKEN: '', HJ_UID: '' };
+const req = new Request('https://app-hub.test-fbc.workers.dev/api/hj/key?url=' + encodeURIComponent(keyUrl) + '&seed=' + encodeURIComponent(seed), { method: 'GET' });
+const res = await handler(req, env);
+const buf = new Uint8Array(await res.arrayBuffer());
+console.log('key resp:', res.status, res.headers.get('content-type'), 'len:', buf.length, 'hex:', Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join(' '));
+console.log('expected: da76d5fd2fa4f272145389d889e97a2c');
