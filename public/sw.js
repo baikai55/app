@@ -1,6 +1,5 @@
-const VERSION = 'kanjuboost-v1';
+const VERSION = 'kanjuboost-v2';
 const CORE_ASSETS = [
-  '/',
   '/css/style.css',
   '/js/app.js',
   '/vendor/hls.min.js',
@@ -17,6 +16,10 @@ self.addEventListener('install', (event) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
@@ -31,27 +34,18 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
-  if (url.pathname === '/') {
-    event.respondWith(
-      fetch(request).then((response) => {
-        const copy = response.clone();
-        caches.open(VERSION).then((cache) => cache.put('/', copy));
-        return response;
-      }).catch(() => caches.match('/')),
-    );
-    return;
-  }
 
+  // 页面和资源都走 network-first：每次刷新先问网络拿最新，失败才用缓存兜底。
+  // 这样部署更新后刷新一次就能拿到新内容，不被旧缓存卡住。
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (response.ok && url.pathname.match(/\.(css|js|png|webmanifest|wasm)$/)) {
+    fetch(request)
+      .then((response) => {
+        if (response && response.ok && url.pathname.match(/\.(css|js|png|webmanifest|wasm)$/)) {
           const copy = response.clone();
           caches.open(VERSION).then((cache) => cache.put(request, copy));
         }
         return response;
-      }).catch(() => cached || new Response('Offline', { status: 503 }));
-    }),
+      })
+      .catch(() => caches.match(request).then((cached) => cached || new Response('Offline', { status: 503 }))),
   );
 });

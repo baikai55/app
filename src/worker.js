@@ -288,7 +288,33 @@ export default {
     const path = url.pathname;
 
     if (request.method === 'GET' && (path === '/' || !path.startsWith('/api/'))) {
-      return env.ASSETS.fetch(request);
+      const asset = await env.ASSETS.fetch(request);
+      if (path === '/sw.js') {
+        return new Response(asset.body, {
+          status: asset.status,
+          headers: {
+            ...Object.fromEntries(asset.headers),
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Content-Type': 'application/javascript; charset=utf-8',
+          },
+        });
+      }
+      if (path === '/' || path === '/index.html') {
+        const html = await asset.text();
+        const version = 'v' + Math.floor(Date.now() / 60000);
+        const patched = html
+          .replace(/(\/css\/style\.css)(\?v=[^"']*)?/g, `/css/style.css?v=${version}`)
+          .replace(/(\/js\/app\.js)(\?v=[^"']*)?/g, `/js/app.js?v=${version}`);
+        return new Response(patched, {
+          status: asset.status,
+          headers: {
+            ...Object.fromEntries(asset.headers),
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+          },
+        });
+      }
+      return asset;
     }
 
     if (path === '/api/meta') return handleMeta();
