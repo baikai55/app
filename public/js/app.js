@@ -359,6 +359,13 @@
         const togglePlay = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
         let lastTap = 0;
         let tapHandled = false;
+        let lastToggle = 0;
+        const safeToggle = () => {
+          const now = Date.now();
+          if (now - lastToggle < 450) return;
+          lastToggle = now;
+          togglePlay();
+        };
         const onTouchEnd = (e) => {
           if (isControl(e)) return;
           const now = Date.now();
@@ -366,7 +373,7 @@
             lastTap = 0;
             if (tapHandled) { tapHandled = false; return; }
             tapHandled = true;
-            togglePlay();
+            safeToggle();
           } else {
             lastTap = now;
             tapHandled = false;
@@ -379,7 +386,7 @@
           e.stopImmediatePropagation();
           lastTap = 0;
           tapHandled = false;
-          togglePlay();
+          safeToggle();
         }, { capture: true });
         if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
           artContainer.addEventListener('touchend', onTouchEnd, { capture: true });
