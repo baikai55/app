@@ -117,5 +117,13 @@ if (firstHj) {
     const hjText = hjP.body;
     const hjLines = String(hjText).split('\n');
     console.log('hj playlist extinf:', hjLines.filter(l => l.startsWith('#EXTINF')).length, 'firstSeg:', hjLines.find(l => !l.startsWith('#')), 'keyLine:', hjLines.find(l => l.startsWith('#EXT-X-KEY')));
+    const keyLine = hjLines.find(l => l.startsWith('#EXT-X-KEY'));
+    if (keyLine) {
+      const m = keyLine.match(/URI="([^"]+)"/);
+      if (m) {
+        const keyResp = await call(m[1].startsWith('http') ? m[1] : 'https://app-hub.test-fbc.workers.dev' + m[1]);
+        console.log('hj key resp:', keyResp.status, keyResp.ct, 'len:', String(keyResp.body).length, 'hex:', typeof keyResp.body === 'string' ? Array.from(new Uint8Array([...String(keyResp.body)].map(c=>c.charCodeAt(0))).slice(0, 16)).map(b=>b.toString(16).padStart(2,'0')).join(' ') : '');
+      }
+    }
   }
 }

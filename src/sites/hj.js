@@ -1,6 +1,7 @@
 'use strict';
 
 const UPSTREAM = 'https://haijiao.com';
+import { deriveKey, decodeSeedText } from '../lib/hjkey.js';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 
@@ -287,7 +288,17 @@ async function tryUpgradePlaylistUrl(playUrl) {
   return result;
 }
 
-function rewritePlaylist(text, base) {
+function companionSeedUrl(playlistUrl) {
+  try {
+    const u = new URL(playlistUrl);
+    u.pathname = u.pathname.replace(/\.m3u8$/i, '.jpg');
+    return u.toString();
+  } catch {
+    return '';
+  }
+}
+
+function rewritePlaylist(text, base, seedUrl) {
   const lines = text.split(/\r?\n/);
   const out = [];
   for (const line of lines) {
@@ -300,7 +311,7 @@ function rewritePlaylist(text, base) {
         try {
           full = new URL(uriMatch[3], base).toString();
         } catch {}
-        const proxied = '/api/hj/key?url=' + encodeURIComponent(full);
+        const proxied = '/api/hj/key?url=' + encodeURIComponent(full) + (seedUrl ? '&seed=' + encodeURIComponent(seedUrl) : '');
         rewritten =
           rewritten.slice(0, uriMatch.index) +
           uriMatch[1] +
@@ -454,7 +465,8 @@ async function play(site, url, h) {
   const resp = await proxyFetch(upgraded);
   if (!resp.ok) return new Response(await resp.text(), { status: resp.status });
   const text = await resp.text();
-  const rewritten = rewritePlaylist(text, upgraded);
+  const seedUrl = companionSeedUrl(upgraded);
+  const rewritten = rewritePlaylist(text, upgraded, seedUrl);
   return new Response(rewritten, {
     status: 200,
     headers: {
@@ -467,10 +479,28 @@ async function play(site, url, h) {
 
 async function key(site, url, h) {
   const target = url.searchParams.get('url') || '';
+  const seedTarget = url.searchParams.get('seed') || '';
   if (!/^https:\/\//.test(target)) return h.json({ ok: false, error: '地址无效' }, 400);
-  const resp = await proxyFetch(target);
-  return new Response(resp.body, {
-    status: resp.status,
+  const keyResp = await proxyFetch(target);
+  if (!keyResp.ok) return new Response(await keyResp.text(), { status: keyResp.status });
+  let keyBytes = new Uint8Array(await keyResp.arrayBuffer());
+
+  if (seedTarget && /^https:\/\//.test(seedTarget)) {
+    try {
+      const seedResp = await proxyFetch(seedTarget);
+      if (seedResp.ok) {
+        const seedText = await seedResp.text();
+        const seedBytes = decodeSeedText(seedText);
+        const derived = await deriveKey(keyBytes, seedBytes);
+        if (derived && derived.length === 16) keyBytes = derived;
+      }
+    } catch {
+      // fallback: keep original key bytes
+    }
+  }
+
+  return new Response(keyBytes, {
+    status: 200,
     headers: {
       'Content-Type': 'application/octet-stream',
       'Access-Control-Allow-Origin': '*',
