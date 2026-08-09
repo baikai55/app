@@ -403,7 +403,8 @@
         };
         const onTap = () => {
           if (video.paused) {
-            video.play().catch(() => {});
+            console.log('__TAP resume', video.paused);
+            video.play().catch((er) => console.log('__TAP play err', er && er.name));
             return;
           }
           const now = Date.now();
@@ -421,6 +422,7 @@
           e.stopPropagation();
           e.stopImmediatePropagation();
           if (suppressClick) return;
+          console.log('__CLK tap paused=', video.paused, 'tgt=', e.target && e.target.tagName);
           onTap();
         }, { capture: true });
         artContainer.addEventListener('dblclick', (e) => {
