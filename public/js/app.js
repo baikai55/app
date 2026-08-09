@@ -356,31 +356,32 @@
           e.stopPropagation();
           e.stopImmediatePropagation();
         }, { capture: true });
-        let clickTimer = null;
-        artContainer.addEventListener('dblclick', (e) => {
-          if (isControl(e)) return;
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-          if (video.paused) video.play().catch(() => {}); else video.pause();
-        }, { capture: true });
-        if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
+        const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+        const togglePlay = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
+        if (!isTouchDevice) {
+          artContainer.addEventListener('dblclick', (e) => {
+            if (isControl(e)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            togglePlay();
+          }, { capture: true });
+        } else {
           let lastTap = 0;
-          let tapped = false;
+          let tapHandled = false;
           artContainer.addEventListener('touchend', (e) => {
             if (isControl(e)) return;
             const now = Date.now();
             if (now - lastTap < 350) {
               lastTap = 0;
-              if (tapped) { tapped = false; return; }
-              tapped = true;
-              if (video.paused) video.play().catch(() => {}); else video.pause();
+              if (tapHandled) { tapHandled = false; return; }
+              tapHandled = true;
+              togglePlay();
             } else {
               lastTap = now;
-              tapped = false;
+              tapHandled = false;
             }
-          });
+          }, { capture: true });
         }
       }
       const ready = () => {
