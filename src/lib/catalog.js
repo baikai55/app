@@ -62,7 +62,7 @@ const SITES = [
   },
   {
     id: 'mr',
-    name: '麻人电台',
+    name: '每日大赛',
     tagline: '每日大赛与黑料',
     baseUrl: 'https://www.mrds66.com/',
     module: 'mr',
