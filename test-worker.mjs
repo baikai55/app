@@ -17,9 +17,15 @@ globalThis.ASSETS = {
 const mod = await import('file:///H:/聚合/app-hub/src/worker.js');
 const handler = mod.default.fetch;
 
+const TEST_ENV = {
+  ASSETS,
+  HJ_TOKEN: process.env.HJ_TOKEN || '',
+  HJ_UID: process.env.HJ_UID || '',
+};
+
 async function call(path, method = 'GET') {
   const req = new Request('https://app-hub.test-fbc.workers.dev' + path, { method });
-  const res = await handler(req, { ASSETS });
+  const res = await handler(req, TEST_ENV);
   const ct = res.headers.get('content-type') || '';
   const text = await res.text();
   let body = text;
@@ -86,7 +92,7 @@ console.log('madouai list cover0:', mdList.posts?.[0]?.coverUrl);
 
 async function imgProbe(url) {
   const req = new Request(url, { method: 'GET' });
-  const res = await handler(req, { ASSETS });
+  const res = await handler(req, TEST_ENV);
   const bytes = new Uint8Array(await res.arrayBuffer());
   console.log(url.split('?')[0], '->', res.status, res.headers.get('content-type'), 'len:', bytes.length);
 }
@@ -94,3 +100,22 @@ if (k91List.posts?.[0]?.coverUrl) await imgProbe('https://app-hub.test-fbc.worke
 if (mrList.posts?.[0]?.coverUrl) await imgProbe('https://app-hub.test-fbc.workers.dev' + mrList.posts[0].coverUrl);
 if (txList.posts?.[0]?.coverUrl) await imgProbe('https://app-hub.test-fbc.workers.dev' + txList.posts[0].coverUrl);
 if (mdList.posts?.[0]?.coverUrl) await imgProbe('https://app-hub.test-fbc.workers.dev' + mdList.posts[0].coverUrl);
+
+// hj site checks
+console.log('--- hj ---');
+const hjList = await call('/api/hj/posts');
+const hjListHot = await call('/api/hj/posts?feed=hot');
+const hjListNews = await call('/api/hj/posts?feed=news');
+console.log('hj posts count:', hjList.body?.posts?.length, 'first:', JSON.stringify(hjList.body?.posts?.[0]?.title)?.slice(0, 60), 'cover:', hjList.body?.posts?.[0]?.coverUrl?.slice(0, 80));
+const firstHj = hjList.body?.posts?.[0];
+if (firstHj) {
+  const hjDetail = await call('/api/hj/post/' + encodeURIComponent(firstHj.id));
+  console.log('hj detail title:', hjDetail.body?.post?.title?.slice(0, 60), 'playUrl:', hjDetail.body?.post?.playUrl, 'videos:', hjDetail.body?.post?.videos?.length, 'cover:', hjDetail.body?.post?.coverUrl?.slice(0, 80));
+  if (hjDetail.body?.post?.coverUrl) await imgProbe('https://app-hub.test-fbc.workers.dev' + hjDetail.body.post.coverUrl);
+  if (hjDetail.body?.post?.playUrl) {
+    const hjP = await call(hjDetail.body.post.playUrl.replace('/api/hj/', '/api/hj/'));
+    const hjText = hjP.body;
+    const hjLines = String(hjText).split('\n');
+    console.log('hj playlist extinf:', hjLines.filter(l => l.startsWith('#EXTINF')).length, 'firstSeg:', hjLines.find(l => !l.startsWith('#')), 'keyLine:', hjLines.find(l => l.startsWith('#EXT-X-KEY')));
+  }
+}

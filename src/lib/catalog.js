@@ -210,6 +210,22 @@ const SITES = [
       { id: 'sa国际传媒', name: 'SA国际传媒' },
     ],
   },
+  {
+    id: 'hj',
+    name: '看海角',
+    tagline: '海角社区内容聚合',
+    baseUrl: 'https://haijiao.com/',
+    module: 'hj',
+    feeds: [
+      { id: 'hot', name: '热帖', isHome: true },
+      { id: 'news', name: '新闻' },
+      { id: 'events', name: '大事记' },
+      { id: 'original', name: '原创' },
+      { id: 'essence', name: '精华' },
+      { id: 'notice', name: '公告' },
+      { id: 'latest', name: '最新' },
+    ],
+  },
 ];
 
 function findSite(id) {

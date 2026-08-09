@@ -11,8 +11,9 @@ import * as rou from './sites/rou.js';
 import * as best from './sites/best.js';
 import * as madouai from './sites/madouai.js';
 import * as madou from './sites/madou.js';
+import * as hj from './sites/hj.js';
 
-const SITE_MODULES = { kan91, mr, tx, rou, best, madouai, madou };
+const SITE_MODULES = { kan91, mr, tx, rou, best, madouai, madou, hj };
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
@@ -79,20 +80,21 @@ async function handleMeta() {
   });
 }
 
-function moduleContext(site) {
+function moduleContext(site, env) {
   return {
     fetch: (u, o) => fetch(u, o),
     ua: UA,
     baseUrl: site.baseUrl,
     upstream,
     json,
+    env,
   };
 }
 
-async function handlePosts(site, url) {
+async function handlePosts(site, url, env) {
   const mod = moduleFor(site);
   if (mod && typeof mod.posts === 'function') {
-    return mod.posts(site, url, moduleContext(site));
+    return mod.posts(site, url, moduleContext(site, env));
   }
   const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
   const feedId = url.searchParams.get('feed') || site.feeds[0].id;
@@ -145,10 +147,10 @@ async function findAvjbDetailUrl(site, videoId) {
   return null;
 }
 
-async function handlePost(site, url) {
+async function handlePost(site, url, env) {
   const mod = moduleFor(site);
   if (mod && typeof mod.post === 'function') {
-    return mod.post(site, url, moduleContext(site));
+    return mod.post(site, url, moduleContext(site, env));
   }
   const segments = url.pathname.split('/').filter(Boolean);
   const rawId = decodeURIComponent(segments[segments.length - 1] || '');
@@ -304,9 +306,9 @@ export default {
       const site = findSite(siteMatch[1]);
       if (!site) return json({ error: '未知站点' }, 404);
       try {
-        if (path.includes('/posts')) return await handlePosts(site, url);
+        if (path.includes('/posts')) return await handlePosts(site, url, env);
         if (path.includes('/play/')) return await handlePlay(site, url);
-        return await handlePost(site, url);
+        return await handlePost(site, url, env);
       } catch (error) {
         return json({ error: error.message || '服务暂时不可用' }, 502);
       }
@@ -319,7 +321,7 @@ export default {
       const mod = moduleFor(site);
       if (mod && typeof mod[moduleRoute[2]] === 'function') {
         try {
-          return await mod[moduleRoute[2]](site, url, moduleContext(site));
+          return await mod[moduleRoute[2]](site, url, moduleContext(site, env));
         } catch (error) {
           return json({ error: error.message || '服务暂时不可用' }, 502);
         }
