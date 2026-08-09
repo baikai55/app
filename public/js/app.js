@@ -340,12 +340,49 @@
         fullscreenWeb: true,
         miniProgressBar: true,
         lock: true,
+        gesture: true,
         playsInline: true,
         moreVideoAttr: { preload: 'metadata', playsInline: true },
         customType: { m3u8: attachHls },
       });
       state.art = art;
       const video = art.video;
+      const artContainer = art.template.$container || document.querySelector('#art-player');
+      if (artContainer) {
+        const isControl = (e) => !!(e.target && e.target.closest && e.target.closest('.art-icon, .art-control, .art-contextmenu, .art-settings, .art-selector'));
+        artContainer.addEventListener('click', (e) => {
+          if (isControl(e)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+        }, { capture: true });
+        let clickTimer = null;
+        artContainer.addEventListener('dblclick', (e) => {
+          if (isControl(e)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+          art.toggle();
+        }, { capture: true });
+        if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
+          let lastTap = 0;
+          let tapTimer = null;
+          artContainer.addEventListener('touchend', (e) => {
+            if (isControl(e)) return;
+            const now = Date.now();
+            if (now - lastTap < 350) {
+              lastTap = 0;
+              if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
+              art.toggle();
+            } else {
+              lastTap = now;
+              if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
+              tapTimer = setTimeout(() => {}, 350);
+            }
+          }, { capture: true });
+        }
+      }
       const ready = () => {
         window.clearTimeout(state.playerTimer);
         state.playerTimer = null;
