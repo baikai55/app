@@ -361,6 +361,21 @@
         const toggleControls = () => {
           try { art.controls.show = !art.controls.show; } catch {}
         };
+        const fmtTime = (sec) => {
+          if (!Number.isFinite(sec) || sec < 0) return '00:00';
+          const h = Math.floor(sec / 3600);
+          const m = Math.floor((sec % 3600) / 60);
+          const s = Math.floor(sec % 60);
+          const mm = String(m).padStart(2, '0');
+          const ss = String(s).padStart(2, '0');
+          return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+        };
+        const showSeekTime = (target) => {
+          try { art.notice.show = `${fmtTime(target)} / ${fmtTime(video.duration)}`; } catch {}
+        };
+        const clearSeekTime = () => {
+          try { art.notice.show = ''; } catch {}
+        };
         let lastTap = 0;
         let singleTimer = null;
         let doubleFired = false;
@@ -387,6 +402,10 @@
           togglePlay();
         };
         const onTap = () => {
+          if (video.paused) {
+            video.play().catch(() => {});
+            return;
+          }
           const now = Date.now();
           if (now - lastTap < 350) {
             lastTap = 0;
@@ -424,28 +443,30 @@
           if (e.button !== 0) return;
           drag = { x: e.clientX, y: e.clientY, t: video.currentTime || 0, moved: false };
         };
-        const onMouseMove = (e) => {
-          if (!drag) return;
-          const dx = e.clientX - drag.x;
-          const dy = e.clientY - drag.y;
-          if (!drag.moved) {
-            if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-            if (Math.abs(dx) < Math.abs(dy)) { drag = null; return; }
-            drag.moved = true;
-          }
-          e.preventDefault();
-          const width = artContainer.clientWidth || 1;
-          const delta = (dx / width) * (video.duration || 0);
-          const target = Math.max(0, Math.min(video.duration || 0, drag.t + delta));
-          video.currentTime = target;
-        };
-        const onMouseUp = (e) => {
-          if (drag && drag.moved) {
-            suppressClick = true;
-            setTimeout(() => { suppressClick = false; }, 400);
-          }
-          drag = null;
-        };
+          const onMouseMove = (e) => {
+            if (!drag) return;
+            const dx = e.clientX - drag.x;
+            const dy = e.clientY - drag.y;
+            if (!drag.moved) {
+              if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+              if (Math.abs(dx) < Math.abs(dy)) { drag = null; return; }
+              drag.moved = true;
+            }
+            e.preventDefault();
+            const width = artContainer.clientWidth || 1;
+            const delta = (dx / width) * (video.duration || 0);
+            const target = Math.max(0, Math.min(video.duration || 0, drag.t + delta));
+            video.currentTime = target;
+            showSeekTime(target);
+          };
+          const onMouseUp = (e) => {
+            if (drag && drag.moved) {
+              suppressClick = true;
+              setTimeout(() => { suppressClick = false; }, 400);
+              clearSeekTime();
+            }
+            drag = null;
+          };
         artContainer.addEventListener('mousedown', onMouseDown, { capture: true });
         if (sig) {
           window.addEventListener('mousemove', onMouseMove, { capture: true, signal: sig });
