@@ -356,32 +356,33 @@
           e.stopPropagation();
           e.stopImmediatePropagation();
         }, { capture: true });
-        const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
         const togglePlay = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
-        if (!isTouchDevice) {
-          artContainer.addEventListener('dblclick', (e) => {
-            if (isControl(e)) return;
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
+        let lastTap = 0;
+        let tapHandled = false;
+        const onTouchEnd = (e) => {
+          if (isControl(e)) return;
+          const now = Date.now();
+          if (now - lastTap < 350) {
+            lastTap = 0;
+            if (tapHandled) { tapHandled = false; return; }
+            tapHandled = true;
             togglePlay();
-          }, { capture: true });
-        } else {
-          let lastTap = 0;
-          let tapHandled = false;
-          artContainer.addEventListener('touchend', (e) => {
-            if (isControl(e)) return;
-            const now = Date.now();
-            if (now - lastTap < 350) {
-              lastTap = 0;
-              if (tapHandled) { tapHandled = false; return; }
-              tapHandled = true;
-              togglePlay();
-            } else {
-              lastTap = now;
-              tapHandled = false;
-            }
-          }, { capture: true });
+          } else {
+            lastTap = now;
+            tapHandled = false;
+          }
+        };
+        artContainer.addEventListener('dblclick', (e) => {
+          if (isControl(e)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          lastTap = 0;
+          tapHandled = false;
+          togglePlay();
+        }, { capture: true });
+        if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
+          artContainer.addEventListener('touchend', onTouchEnd, { capture: true });
         }
       }
       const ready = () => {
