@@ -130,7 +130,7 @@ img { display: block; max-width: 100%; }
 .detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
 .detail-main { min-width: 0; }
 .player-shell { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: #000; }
-.art-player { position: absolute; inset: 0; }
+.art-player { position: absolute; inset: 0; touch-action: none; }
 .art-player, .art-player .art-video-player, .art-player .art-video { width: 100%; height: 100%; background: #000; }
 .player-skeleton .skeleton-media { width: 100%; height: 100%; }
 .player-feedback { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
