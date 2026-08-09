@@ -377,6 +377,11 @@
               lastTap = now;
             }
           });
+          artContainer.addEventListener('touchend', (e) => {
+            const st = window.__tapState || (window.__tapState = { n: 0 });
+            st.n++;
+            if (st.n <= 3) console.log('__tap', st.n, 'target=', e.target && e.target.tagName, 'cls=', e.target && e.target.className && String(e.target.className).slice(0, 30));
+          });
         }
       }
       const ready = () => {
