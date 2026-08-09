@@ -403,8 +403,7 @@
         };
         const onTap = () => {
           if (video.paused) {
-            console.log('__TAP resume', video.paused);
-            video.play().catch((er) => console.log('__TAP play err', er && er.name));
+            video.play().catch(() => {});
             return;
           }
           const now = Date.now();
@@ -421,8 +420,13 @@
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
+        }, { capture: true });
+        artContainer.addEventListener('pointerup', (e) => {
+          if (isControl(e)) return;
           if (suppressClick) return;
-          console.log('__CLK tap paused=', video.paused, 'tgt=', e.target && e.target.tagName);
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
           onTap();
         }, { capture: true });
         artContainer.addEventListener('dblclick', (e) => {
