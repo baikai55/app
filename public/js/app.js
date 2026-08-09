@@ -372,7 +372,10 @@
             const now = Date.now();
             if (now - lastTap < 350) {
               lastTap = 0;
+              const wasPlaying = art.playing;
               if (art.playing) art.pause(); else art.play();
+              console.log('__dbl playingBefore=', wasPlaying, 'pausedNow=', art.video.paused);
+              setTimeout(() => console.log('__dbl paused100=', art.video.paused, 'playing=', art.playing), 120);
             } else {
               lastTap = now;
             }
