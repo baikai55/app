@@ -349,7 +349,7 @@
       const video = art.video;
       state.mediaEvents = new AbortController();
       const artContainer = document.querySelector('#art-player');
-      if (artContainer) {        const isControl = (e) => !!(e.target && e.target.closest && e.target.closest('.art-icon, .art-control, .art-contextmenu, .art-settings, .art-selector, .art-progress'));
+      if (artContainer) {        const isControl = (e) => !!(e.target && e.target.closest && e.target.closest('.art-control, .art-contextmenu, .art-settings, .art-selector, .art-progress, .art-bottom .art-controls'));
         let suppressClick = false;
         artContainer.addEventListener('click', (e) => {
           if (isControl(e)) return;
