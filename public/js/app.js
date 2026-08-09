@@ -367,20 +367,16 @@
         }, { capture: true });
         if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
           let lastTap = 0;
-          let tapTimer = null;
           artContainer.addEventListener('touchend', (e) => {
             if (isControl(e)) return;
             const now = Date.now();
             if (now - lastTap < 350) {
               lastTap = 0;
-              if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
               if (video.paused) video.play().catch(() => {}); else video.pause();
             } else {
               lastTap = now;
-              if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
-              tapTimer = setTimeout(() => {}, 350);
             }
-          }, { capture: true });
+          });
         }
       }
       const ready = () => {
