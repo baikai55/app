@@ -15,6 +15,8 @@
     route: null,
     controller: null,
     navController: null,
+    navReady: false,
+    navPromise: null,
     version: 0,
     canceledVersion: 0,
     currentDetail: null,
@@ -214,6 +216,7 @@
         state.navData = { sites: [], categories: [] };
       }
     } finally {
+      state.navReady = true;
       renderNav();
     }
   }
@@ -221,7 +224,10 @@
   function pagerHTML(route, page, totalPages, hasNext) {
     const previous = page > 1 ? page - 1 : 0;
     const next = (totalPages ? totalPages > page : hasNext) ? page + 1 : 0;
-    return `<nav class="pager" aria-label="分页"><a class="button${previous ? '' : ' disabled'}" href="${esc(previous ? linkTo({ ...route, page: previous }) : '#')}" data-link ${previous ? '' : 'aria-disabled="true"'}>上一页</a><span>${page} 页${totalPages ? ` / ${totalPages} 页` : ''}</span><a class="button${next ? '' : ' disabled'}" href="${esc(next ? linkTo({ ...route, page: next }) : '#')}" data-link ${next ? '' : 'aria-disabled="true"'}>下一页</a></nav>`;
+    const control = (label, targetPage) => targetPage
+      ? `<a class="button" href="${esc(linkTo({ ...route, page: targetPage }))}" data-link>${label}</a>`
+      : `<button type="button" class="button" disabled>${label}</button>`;
+    return `<nav class="pager" aria-label="分页">${control('上一页', previous)}<span>${page} 页${totalPages ? ` / ${totalPages} 页` : ''}</span>${control('下一页', next)}</nav>`;
   }
 
   async function renderList(route, signal, version) {
@@ -500,6 +506,10 @@
     const next = parseHash();
     state.route = next;
     renderNav();
+    if (!state.navReady) {
+      await state.navPromise;
+      if (version !== state.version || state.controller.signal.aborted) return;
+    }
     if (next.name === 'home') return renderList(next, state.controller.signal, version);
     if (next.name === 'category') return renderList(next, state.controller.signal, version);
     if (next.name === 'detail') return renderDetail(next, state.controller.signal, version);
@@ -542,6 +552,6 @@
 
   window.addEventListener('hashchange', route);
   renderNav();
-  loadNav();
+  state.navPromise = loadNav();
   route();
 })();
