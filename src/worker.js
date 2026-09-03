@@ -16,6 +16,8 @@ import * as hj from './sites/hj.js';
 const SITE_MODULES = { kan91, mr, tx, rou, best, madouai, madou, hj };
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const UPSTREAM_RETRY_DELAYS = [0, 250, 750];
+const RETRYABLE_UPSTREAM_STATUS = new Set([403, 429, 500, 502, 503, 504]);
 
 const json = (data, status = 200, cache = 'no-store') =>
   new Response(JSON.stringify(data), {
@@ -33,17 +35,38 @@ function assetHeaders(asset, contentType, cacheControl) {
 }
 
 async function upstream(site, url, { method = 'GET', headers = {}, referer, allowHtml = false } = {}) {
-  const res = await fetch(url, {
-    method,
-    redirect: 'follow',
-    headers: {
-      'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
-      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.7',
-      Referer: referer || site.baseUrl,
-      ...headers,
-    },
-  });
+  const requestMethod = String(method).toUpperCase();
+  const canRetry = requestMethod === 'GET' || requestMethod === 'HEAD';
+  const retryDelays = canRetry ? UPSTREAM_RETRY_DELAYS : [0];
+  const requestHeaders = {
+    'User-Agent': UA,
+    Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.7',
+    Referer: referer || site.baseUrl,
+    ...headers,
+  };
+  let res;
+  let networkError;
+  for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+    if (retryDelays[attempt]) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
+    }
+    try {
+      res = await fetch(url, {
+        method: requestMethod,
+        redirect: 'follow',
+        headers: attempt ? { ...requestHeaders, 'Cache-Control': 'no-cache' } : requestHeaders,
+      });
+      networkError = null;
+    } catch (error) {
+      networkError = error;
+      if (attempt === retryDelays.length - 1) throw new Error('上游源站暂时不可达');
+      continue;
+    }
+    if (res.ok || !RETRYABLE_UPSTREAM_STATUS.has(res.status) || attempt === retryDelays.length - 1) break;
+    try { await res.body?.cancel(); } catch {}
+  }
+  if (!res) throw networkError || new Error('上游源站暂时不可达');
   if (!res.ok) throw new Error(`上游源站响应异常 (${res.status})`);
   const contentType = (res.headers.get('content-type') || '').toLowerCase();
   if (!allowHtml && /^(image|audio|video)\//.test(contentType) && !/mpegurl|x-mpegurl|vnd\.apple\.mpegurl/.test(contentType)) {
