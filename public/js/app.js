@@ -2,6 +2,7 @@
   'use strict';
 
   const app = document.getElementById('app');
+  const topbar = document.querySelector('.topbar');
   const quickNav = document.getElementById('quickNav');
   const drawer = document.getElementById('drawer');
   const drawerMask = document.getElementById('drawerMask');
@@ -9,6 +10,8 @@
   const drawerClose = document.getElementById('drawerClose');
   const catNav = document.getElementById('catNav');
   const rankNav = document.getElementById('rankNav');
+  const routeStatus = document.getElementById('routeStatus');
+  const routeAlert = document.getElementById('routeAlert');
 
   const state = {
     navData: { sites: [], categories: [] },
@@ -24,8 +27,8 @@
     art: null,
     mediaEvents: null,
     playerController: null,
-    playerRecoveryUsed: false,
     playerTimer: null,
+    drawerPreviousFocus: null,
   };
 
   const esc = (value) => String(value ?? '')
@@ -105,11 +108,50 @@
     return `${base}/`;
   }
 
-  function setDrawer(open) {
+  const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  function drawerFocusable() {
+    return Array.from(drawer.querySelectorAll(focusableSelector)).filter((element) => element.getClientRects().length > 0);
+  }
+
+  function setDrawer(open, { restoreFocus = true } = {}) {
+    if (open === drawer.classList.contains('open')) return;
+    if (open) {
+      state.drawerPreviousFocus = document.activeElement instanceof HTMLElement
+        && document.activeElement !== document.body ? document.activeElement : menuBtn;
+    }
     drawer.classList.toggle('open', open);
     drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+    drawer.inert = !open;
+    drawer.toggleAttribute('inert', !open);
     drawerMask.hidden = !open;
+    app.inert = open;
+    app.toggleAttribute('inert', open);
+    topbar.inert = open;
+    topbar.toggleAttribute('inert', open);
+    menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
     document.body.classList.toggle('drawer-open', open);
+    if (open) {
+      drawerClose.focus({ preventScroll: true });
+    } else {
+      const previousFocus = state.drawerPreviousFocus;
+      state.drawerPreviousFocus = null;
+      if (restoreFocus && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    }
+  }
+
+  function announce(message, { error = false } = {}) {
+    if (!routeStatus || !routeAlert) return;
+    routeStatus.textContent = '';
+    routeAlert.textContent = '';
+    (error ? routeAlert : routeStatus).textContent = message || '';
+  }
+
+  function finishRoute({ message, error = false } = {}) {
+    app.setAttribute('aria-busy', 'false');
+    announce(message, { error });
+    const target = app.querySelector('[data-page-focus]') || app.querySelector('h1') || app;
+    target.focus({ preventScroll: true });
   }
 
   function destroyPlayer({ abortRequest = true } = {}) {
@@ -127,7 +169,6 @@
       try { state.art.destroy(true); } catch {}
       state.art = null;
     }
-    state.playerRecoveryUsed = false;
   }
 
   function skeletonGrid(count = 12) {
@@ -144,7 +185,7 @@
   }
 
   function errorState(message, { title = '暂时无法加载', back = false } = {}) {
-    return `<div class="error-state"><strong>${esc(title)}</strong><span>${esc(message || '请稍后重试')}</span>
+    return `<div class="error-state"><h2 tabindex="-1" data-page-focus>${esc(title)}</h2><span>${esc(message || '请稍后重试')}</span>
       <div class="state-actions"><button type="button" class="button primary" data-retry-route>重试</button>${back ? '<button type="button" class="button" data-detail-back>返回列表</button>' : ''}</div>
     </div>`;
   }
@@ -183,23 +224,23 @@
   function quickNavHTML(activeSiteId) {
     const sites = state.navData.sites;
     if (!sites.length) return '';
-    return `<nav class="quick-categories" aria-label="站点导航">${sites.map((site) => `
-      <a class="nav-item${site.id === activeSiteId ? ' active' : ''}" href="#/${encodeURIComponent(site.id)}/" data-link>${esc(site.name)}</a>`).join('')}</nav>`;
+    return sites.map((site) => `
+      <a class="nav-item${site.id === activeSiteId ? ' active' : ''}" href="#/${encodeURIComponent(site.id)}/" data-link${site.id === activeSiteId ? ' aria-current="page"' : ''}>${esc(site.name)}</a>`).join('');
   }
 
   function feedNavHTML(site, activeFeedId) {
     const feeds = site?.feeds || [];
     if (!feeds.length) return '';
     return `<nav class="quick-categories" aria-label="频道分类">${feeds.map((feed) => `
-      <a class="nav-item${feed.id === activeFeedId ? ' active' : ''}" href="#/${encodeURIComponent(site.id)}/category/${encodeURIComponent(feed.id)}" data-link>${esc(feed.name)}</a>`).join('')}</nav>`;
+      <a class="nav-item${feed.id === activeFeedId ? ' active' : ''}" href="#/${encodeURIComponent(site.id)}/category/${encodeURIComponent(feed.id)}" data-link${feed.id === activeFeedId ? ' aria-current="page"' : ''}>${esc(feed.name)}</a>`).join('')}</nav>`;
   }
 
   function renderNav() {
     const route = state.route || parseHash();
-    rankNav.innerHTML = `<a class="chip" href="#/${encodeURIComponent(route.siteId || 'ja')}/" data-link>首页</a>`;
+    rankNav.innerHTML = `<a class="chip" href="#/${encodeURIComponent(route.siteId || 'ja')}/" data-link${route.name === 'home' ? ' aria-current="page"' : ''}>首页</a>`;
     quickNav.innerHTML = quickNavHTML(route.siteId);
     const site = state.navData.sites.find((s) => s.id === route.siteId);
-    catNav.innerHTML = (site?.feeds || []).map((feed) => `<a href="#/${encodeURIComponent(site.id)}/category/${encodeURIComponent(feed.id)}" data-link>${esc(feed.name)}</a>`).join('');
+    catNav.innerHTML = (site?.feeds || []).map((feed) => `<a href="#/${encodeURIComponent(site.id)}/category/${encodeURIComponent(feed.id)}" data-link${route.name === 'category' && route.feedId === feed.id ? ' aria-current="page"' : ''}>${esc(feed.name)}</a>`).join('');
   }
 
   async function loadNav() {
@@ -235,7 +276,9 @@
     const feed = route.name === 'category' ? site?.feeds?.find((f) => f.id === route.feedId) : null;
     const title = route.name === 'category' ? (feed?.name || route.feedId) : (site?.name || route.siteId);
     document.title = `${title} · 看聚合`;
-    app.innerHTML = `<header class="page-head"><div><h1>${esc(title)}</h1><span class="page-meta">浏览目录</span></div></header>${feedNavHTML(site, feed?.id)}${skeletonGrid()}${loadingState()}`;
+    app.setAttribute('aria-busy', 'true');
+    announce(`正在加载${title}`);
+    app.innerHTML = `<header class="page-head"><div><h1 tabindex="-1" data-page-focus>${esc(title)}</h1><span class="page-meta">浏览目录</span></div></header>${feedNavHTML(site, feed?.id)}${skeletonGrid()}${loadingState()}`;
     const params = new URLSearchParams({ page: String(route.page || 1) });
     if (feed) params.set('feed', feed.id);
     try {
@@ -245,13 +288,15 @@
       const page = Number(data.page || route.page || 1);
       const totalPages = Number(data.totalPages) || 0;
       const hasNext = !!data.hasNext;
-      const heading = `<header class="page-head"><div><h1>${esc(title)}</h1><span class="page-meta">第 ${page} 页 · ${items.length} 条</span></div></header>`;
+      const heading = `<header class="page-head"><div><h1 tabindex="-1" data-page-focus>${esc(title)}</h1><span class="page-meta">第 ${page} 页 · ${items.length} 条</span></div></header>`;
       app.innerHTML = `${heading}${feedNavHTML(site, feed?.id)}${items.length ? `<section class="content-grid">${items.map((item) => cardHTML(item, route.siteId)).join('')}</section>${pagerHTML(route, page, totalPages, hasNext)}` : emptyState('没有找到相关内容')}`;
       wireImages();
       window.scrollTo({ top: 0, behavior: 'auto' });
+      finishRoute({ message: `${title}，第 ${page} 页，共 ${items.length} 条内容` });
     } catch (error) {
       if (error?.name === 'AbortError' || version !== state.version || state.canceledVersion === version) return;
       app.innerHTML = errorState(error.message || '列表暂时不可用');
+      finishRoute({ message: error.message || '列表暂时不可用', error: true });
     }
   }
 
@@ -260,7 +305,7 @@
   }
 
   function playerHTML() {
-    return `<div class="player-shell"><div class="art-player" id="art-player"></div><div class="player-feedback" id="playerFeedback"><div class="feedback-label"><span class="loader" aria-hidden="true"></span><span>正在加载</span><button type="button" class="button" data-player-cancel>取消</button></div></div></div>`;
+    return `<div class="player-shell"><div class="art-player" id="art-player"></div><div class="player-feedback" id="playerFeedback" role="status" aria-live="polite" aria-atomic="true"><div class="feedback-label"><span class="loader" aria-hidden="true"></span><span>正在加载</span><button type="button" class="button" data-player-cancel>取消</button></div></div></div>`;
   }
 
   function playerFeedback(message, mode = 'loading') {
@@ -455,6 +500,8 @@
   async function renderDetail(route, signal, version) {
     destroyPlayer();
     document.title = '加载中 · 看聚合';
+    app.setAttribute('aria-busy', 'true');
+    announce('正在加载详情');
     app.innerHTML = detailSkeleton();
     try {
       const data = await request(`/api/${encodeURIComponent(route.siteId)}/post/${encodeURIComponent(route.id)}`, { signal });
@@ -472,7 +519,7 @@
       app.innerHTML = `<button type="button" class="button back-button" data-detail-back>← 返回</button><div class="detail-layout"><section class="detail-main">
         ${post.playUrl ? playerHTML() : '<div class="player-shell"><div class="detail-unavailable">未找到可用播放器</div></div>'}
         <div class="detail-copy">
-          <h1>${esc(post.title || '未命名内容')}</h1>
+          <h1 tabindex="-1" data-page-focus>${esc(post.title || '未命名内容')}</h1>
           <div class="detail-meta">${meta ? `<span>${esc(meta)}</span>` : ''}</div>
           ${tags ? `<div class="tag-list">${tags}</div>` : ''}
           <div class="detail-actions">${post.playUrl ? '<button type="button" class="button primary" data-player-retry>重新加载播放</button>' : ''}</div>
@@ -481,10 +528,12 @@
       </section></div>`;
       wireImages();
       window.scrollTo({ top: 0, behavior: 'auto' });
+      finishRoute({ message: `已打开${post.title || '详情'}` });
       if (post.playUrl) await attachPlayer(post.playUrl, post.coverUrl);
     } catch (error) {
       if (error?.name === 'AbortError' || version !== state.version || state.canceledVersion === version) return;
       app.innerHTML = `<button type="button" class="button back-button" data-detail-back>← 返回</button>${errorState(error.message || '详情暂时不可用')}`;
+      finishRoute({ message: error.message || '详情暂时不可用', error: true });
     }
   }
 
@@ -494,6 +543,7 @@
     state.controller.abort();
     destroyPlayer();
     app.innerHTML = errorState('已取消当前请求', { title: '加载已取消' });
+    finishRoute({ message: '已取消当前请求' });
   }
 
   async function route() {
@@ -502,6 +552,7 @@
     state.controller = new AbortController();
     state.version += 1;
     state.canceledVersion = 0;
+    app.setAttribute('aria-busy', 'true');
     const version = state.version;
     const next = parseHash();
     state.route = next;
@@ -520,34 +571,57 @@
   drawerClose.addEventListener('click', () => setDrawer(false));
   drawerMask.addEventListener('click', () => setDrawer(false));
 
+  document.addEventListener('keydown', (event) => {
+    if (!drawer.classList.contains('open')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setDrawer(false);
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const elements = drawerFocusable();
+    if (!elements.length) {
+      event.preventDefault();
+      drawerClose.focus({ preventScroll: true });
+      return;
+    }
+    const first = elements[0];
+    const last = elements[elements.length - 1];
+    if (event.shiftKey ? document.activeElement === first : document.activeElement === last) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus({ preventScroll: true });
+    }
+  });
+
   document.addEventListener('click', (event) => {
-    const cancel = event.target.closest('[data-cancel-route]');
+    const target = event.target instanceof Element ? event.target : null;
+    const cancel = target?.closest('[data-cancel-route]');
     if (cancel) {
       event.preventDefault();
       cancelCurrentRequest();
       return;
     }
-    if (event.target.closest('[data-retry-route]')) {
+    if (target?.closest('[data-retry-route]')) {
       event.preventDefault();
       route();
       return;
     }
-    if (event.target.closest('[data-detail-back]')) {
+    if (target?.closest('[data-detail-back]')) {
       event.preventDefault();
       history.length > 1 ? history.back() : (location.hash = linkTo({ name: 'home', siteId: state.route?.siteId || 'ja', page: 1 }));
       return;
     }
-    if (event.target.closest('[data-player-cancel]')) {
+    if (target?.closest('[data-player-cancel]')) {
       event.preventDefault();
       state.playerController?.abort();
       playerFeedback('已取消播放解析', 'error');
       return;
     }
-    if (event.target.closest('[data-player-retry]') && state.currentDetail?.post?.playUrl) {
+    if (target?.closest('[data-player-retry]') && state.currentDetail?.post?.playUrl) {
       event.preventDefault();
       attachPlayer(state.currentDetail.post.playUrl, state.currentDetail.post.coverUrl);
     }
-    if (event.target.closest('a[data-link]')) setDrawer(false);
+    if (target?.closest('a[data-link]')) setDrawer(false, { restoreFocus: false });
   });
 
   window.addEventListener('hashchange', route);
