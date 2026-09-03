@@ -28,7 +28,12 @@
     mediaEvents: null,
     playerController: null,
     playerTimer: null,
+    playerClickTimer: null,
+    playerSession: 0,
     drawerPreviousFocus: null,
+    detailReturn: null,
+    pendingListRestore: null,
+    detailNavigationPending: false,
   };
 
   const esc = (value) => String(value ?? '')
@@ -147,28 +152,39 @@
     (error ? routeAlert : routeStatus).textContent = message || '';
   }
 
-  function finishRoute({ message, error = false } = {}) {
+  function finishRoute({ message, error = false, focus = null } = {}) {
     app.setAttribute('aria-busy', 'false');
     announce(message, { error });
-    const target = app.querySelector('[data-page-focus]') || app.querySelector('h1') || app;
+    const target = focus?.isConnected ? focus : app.querySelector('[data-page-focus]') || app.querySelector('h1') || app;
     target.focus({ preventScroll: true });
   }
 
   function destroyPlayer({ abortRequest = true } = {}) {
+    state.playerSession += 1;
     window.clearTimeout(state.playerTimer);
+    window.clearTimeout(state.playerClickTimer);
     state.playerTimer = null;
+    state.playerClickTimer = null;
     state.mediaEvents?.abort();
     state.mediaEvents = null;
     if (abortRequest) state.playerController?.abort();
     state.playerController = null;
-    if (state.hls) {
-      try { state.hls.destroy(); } catch {}
-      state.hls = null;
+    const hls = state.hls;
+    const art = state.art;
+    state.hls = null;
+    state.art = null;
+    if (hls) {
+      try { hls.destroy(); } catch {}
     }
-    if (state.art) {
-      try { state.art.destroy(true); } catch {}
-      state.art = null;
+    const video = art?.video;
+    if (video) {
+      try {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      } catch {}
     }
+    if (art) try { art.destroy(true); } catch {}
   }
 
   function skeletonGrid(count = 12) {
@@ -210,11 +226,60 @@
   function cardHTML(item, siteId) {
     const href = linkTo({ name: 'detail', siteId, id: item.id });
     const meta = [item.duration, item.views != null ? `${item.views} 次` : ''].filter(Boolean).join(' · ');
-    return `<a class="content-card" href="${esc(href)}" data-link>
+    return `<a class="content-card" href="${esc(href)}" data-link data-item-id="${esc(item.id || '')}">
       <div class="card-media" data-image-frame>${imageMarkup(item.coverUrl)}<span class="card-play" aria-hidden="true">▶</span></div>
       <h2 class="card-title">${esc(item.title || '未命名内容')}</h2>
       <div class="card-meta"><span>${esc(meta)}</span></div>
     </a>`;
+  }
+
+  function rememberListView(card) {
+    if (!state.route || !['home', 'category'].includes(state.route.name)) return;
+    const detailHash = card.getAttribute('href');
+    if (!detailHash) return;
+    state.detailReturn = {
+      hash: location.hash,
+      detailHash,
+      itemId: card.dataset.itemId || '',
+      scrollY: window.scrollY,
+    };
+    state.detailNavigationPending = true;
+  }
+
+  function returnFromDetail() {
+    const source = state.detailReturn;
+    if (state.pendingListRestore) return;
+    if (source && source.detailHash === location.hash && state.detailNavigationPending) {
+      state.pendingListRestore = source;
+      state.detailNavigationPending = false;
+      history.back();
+      return;
+    }
+    state.detailReturn = null;
+    state.pendingListRestore = null;
+    state.detailNavigationPending = false;
+    location.hash = linkTo({ name: 'home', siteId: state.route?.siteId || 'ja', page: 1 });
+  }
+
+  function reconcileDetailNavigation(next) {
+    const currentHash = location.hash;
+    const source = state.detailReturn;
+    if (next.name === 'detail') {
+      if (source?.detailHash === currentHash) return;
+      state.detailReturn = null;
+      state.pendingListRestore = null;
+      state.detailNavigationPending = false;
+      return;
+    }
+    if (state.pendingListRestore?.hash === currentHash) return;
+    if (state.route?.name === 'detail' && source?.hash === currentHash) {
+      state.pendingListRestore = source;
+      state.detailNavigationPending = false;
+      return;
+    }
+    state.detailReturn = null;
+    state.pendingListRestore = null;
+    state.detailNavigationPending = false;
   }
 
   function currentSite() {
@@ -272,6 +337,7 @@
   }
 
   async function renderList(route, signal, version) {
+    state.currentDetail = null;
     const site = state.navData.sites.find((s) => s.id === route.siteId);
     const feed = route.name === 'category' ? site?.feeds?.find((f) => f.id === route.feedId) : null;
     const title = route.name === 'category' ? (feed?.name || route.feedId) : (site?.name || route.siteId);
@@ -291,8 +357,17 @@
       const heading = `<header class="page-head"><div><h1 tabindex="-1" data-page-focus>${esc(title)}</h1><span class="page-meta">第 ${page} 页 · ${items.length} 条</span></div></header>`;
       app.innerHTML = `${heading}${feedNavHTML(site, feed?.id)}${items.length ? `<section class="content-grid">${items.map((item) => cardHTML(item, route.siteId)).join('')}</section>${pagerHTML(route, page, totalPages, hasNext)}` : emptyState('没有找到相关内容')}`;
       wireImages();
-      window.scrollTo({ top: 0, behavior: 'auto' });
-      finishRoute({ message: `${title}，第 ${page} 页，共 ${items.length} 条内容` });
+      const restore = state.pendingListRestore?.hash === location.hash ? state.pendingListRestore : null;
+      state.pendingListRestore = null;
+      const focusCard = restore?.itemId
+        ? Array.from(app.querySelectorAll('.content-card[data-item-id]')).find((card) => card.dataset.itemId === restore.itemId)
+        : null;
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const restoreY = Number.isFinite(restore?.scrollY) ? Math.min(restore.scrollY, maxScroll) : 0;
+      window.scrollTo({ top: restore ? restoreY : 0, behavior: 'auto' });
+      state.detailReturn = null;
+      state.detailNavigationPending = false;
+      finishRoute({ message: `${title}，第 ${page} 页，共 ${items.length} 条内容`, focus: focusCard });
     } catch (error) {
       if (error?.name === 'AbortError' || version !== state.version || state.canceledVersion === version) return;
       app.innerHTML = errorState(error.message || '列表暂时不可用');
@@ -308,7 +383,8 @@
     return `<div class="player-shell"><div class="art-player" id="art-player"></div><div class="player-feedback" id="playerFeedback" role="status" aria-live="polite" aria-atomic="true"><div class="feedback-label"><span class="loader" aria-hidden="true"></span><span>正在加载</span><button type="button" class="button" data-player-cancel>取消</button></div></div></div>`;
   }
 
-  function playerFeedback(message, mode = 'loading') {
+  function playerFeedback(message, mode = 'loading', session = null) {
+    if (session != null && state.playerSession !== session) return;
     const box = document.getElementById('playerFeedback');
     if (!box) return;
     if (!message) {
@@ -322,7 +398,10 @@
       : `<div class="feedback-label"><span class="loader" aria-hidden="true"></span><span>${esc(message)}</span><button type="button" class="button" data-player-cancel>取消</button></div>`;
   }
 
-  function attachHls(video, url, art) {
+  function attachHls(video, url, art, session) {
+    let recoveryUsed = false;
+    const isCurrent = () => state.playerSession === session;
+    if (!isCurrent()) return;
     if (!window.Hls || !window.Hls.isSupported()) {
       if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
       else throw new Error('当前浏览器不支持 HLS 播放');
@@ -340,22 +419,25 @@
     });
     state.hls = hls;
     hls.on(window.Hls.Events.MEDIA_ATTACHED, () => {
-      if (state.hls === hls) hls.loadSource(url);
+      if (isCurrent() && state.hls === hls) hls.loadSource(url);
     });
-    hls.on(window.Hls.Events.MANIFEST_PARSED, () => playerFeedback(''));
+    hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+      if (isCurrent() && state.hls === hls) playerFeedback('', 'loading', session);
+    });
     hls.on(window.Hls.Events.ERROR, (_event, data) => {
+      if (!isCurrent() || state.hls !== hls) return;
       if (!data?.fatal) return;
-      if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && !state.playerRecoveryUsed) {
-        state.playerRecoveryUsed = true;
-        playerFeedback('网络波动，正在重连');
+      if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && !recoveryUsed) {
+        recoveryUsed = true;
+        playerFeedback('网络波动，正在重连', 'loading', session);
         hls.startLoad();
         return;
       }
-      playerFeedback('播放失败，请重试', 'error');
+      playerFeedback('播放失败，请重试', 'error', session);
     });
     art.on('destroy', () => {
       if (state.hls === hls) state.hls = null;
-      try { hls.destroy(); } catch {}
+      if (state.playerSession === session) try { hls.destroy(); } catch {}
     });
     hls.attachMedia(video);
   }
@@ -366,9 +448,10 @@
       playerFeedback('播放地址暂时不可用', 'error');
       return;
     }
+    const session = state.playerSession;
     const controller = new AbortController();
     state.playerController = controller;
-    playerFeedback('正在准备播放');
+    playerFeedback('正在准备播放', 'loading', session);
     try {
       const image = publicImage(poster);
       if (!window.Artplayer) throw new Error('播放器加载失败，请刷新页面');
@@ -394,11 +477,17 @@
         gesture: true,
         playsInline: true,
         moreVideoAttr: { preload: 'metadata', playsInline: true },
-        customType: { m3u8: attachHls },
+        customType: { m3u8: (video, url, art) => attachHls(video, url, art, session) },
       });
+      if (state.playerSession !== session) {
+        try { art.destroy(true); } catch {}
+        return;
+      }
       state.art = art;
       const video = art.video;
-      state.mediaEvents = new AbortController();
+      const mediaEvents = new AbortController();
+      state.mediaEvents = mediaEvents;
+      const isCurrent = () => state.playerSession === session && state.art === art;
       const artContainer = document.querySelector('#art-player');
       if (artContainer) {
         const isControl = (e) => !!(e.target && e.target.closest && e.target.closest('.art-control, .art-contextmenu, .art-settings, .art-selector, .art-progress, .art-bottom .art-controls'));
@@ -419,7 +508,6 @@
         };
         let drag = null;
         let suppressClick = false;
-        const sig = state.mediaEvents?.signal;
         const onMouseDown = (e) => {
           if (isControl(e)) return;
           if (e.button !== 0) return;
@@ -444,54 +532,63 @@
         const onMouseUp = (e) => {
           if (drag && drag.moved) {
             suppressClick = true;
-            setTimeout(() => { suppressClick = false; }, 400);
+            window.clearTimeout(state.playerClickTimer);
+            state.playerClickTimer = window.setTimeout(() => {
+              if (isCurrent()) {
+                state.playerClickTimer = null;
+                suppressClick = false;
+              }
+            }, 400);
             clearSeekTime();
           }
           drag = null;
         };
         const suppressClickHandler = (e) => {
-          if (suppressClick) {
+          if (isCurrent() && suppressClick) {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
           }
         };
-        artContainer.addEventListener('click', suppressClickHandler, { capture: true });
-        artContainer.addEventListener('mousedown', onMouseDown, { capture: true });
-        if (sig) {
-          window.addEventListener('mousemove', onMouseMove, { capture: true, signal: sig });
-          window.addEventListener('mouseup', onMouseUp, { capture: true, signal: sig });
-        } else {
-          window.addEventListener('mousemove', onMouseMove, { capture: true });
-          window.addEventListener('mouseup', onMouseUp, { capture: true });
-        }
+        artContainer.addEventListener('click', suppressClickHandler, { capture: true, signal: mediaEvents.signal });
+        artContainer.addEventListener('mousedown', onMouseDown, { capture: true, signal: mediaEvents.signal });
+        window.addEventListener('mousemove', onMouseMove, { capture: true, signal: mediaEvents.signal });
+        window.addEventListener('mouseup', onMouseUp, { capture: true, signal: mediaEvents.signal });
       }
       const ready = () => {
+        if (!isCurrent()) return;
         window.clearTimeout(state.playerTimer);
         state.playerTimer = null;
-        playerFeedback('');
+        playerFeedback('', 'loading', session);
       };
-      const options = { signal: state.mediaEvents.signal };
-      video.addEventListener('loadstart', () => playerFeedback('正在加载'), options);
+      const options = { signal: mediaEvents.signal };
+      video.addEventListener('loadstart', () => {
+        if (isCurrent()) playerFeedback('正在加载', 'loading', session);
+      }, options);
       video.addEventListener('loadedmetadata', ready, options);
       video.addEventListener('canplay', ready, options);
       video.addEventListener('playing', ready, options);
       video.addEventListener('waiting', () => {
-        playerFeedback('正在缓冲');
+        if (!isCurrent()) return;
+        playerFeedback('正在缓冲', 'loading', session);
         window.clearTimeout(state.playerTimer);
         state.playerTimer = window.setTimeout(() => {
-          if (video.readyState < 3) playerFeedback('等待时间较长，请重试', 'error');
+          if (isCurrent() && video.readyState < 3) playerFeedback('等待时间较长，请重试', 'error', session);
         }, 18_000);
       }, options);
-      video.addEventListener('seeking', () => playerFeedback('正在定位'), options);
+      video.addEventListener('seeking', () => {
+        if (isCurrent()) playerFeedback('正在定位', 'loading', session);
+      }, options);
       video.addEventListener('seeked', ready, options);
       video.addEventListener('error', () => {
-        if (!state.hls) playerFeedback('播放失败，请重试', 'error');
+        if (isCurrent() && !state.hls) playerFeedback('播放失败，请重试', 'error', session);
       }, options);
-      art.on('ready', ready);
+      art.on('ready', () => {
+        if (isCurrent()) ready();
+      });
       if (video.readyState >= 3) ready();
     } catch (error) {
-      if (error?.name === 'AbortError') return;
+      if (error?.name === 'AbortError' || state.playerSession !== session) return;
       destroyPlayer({ abortRequest: false });
       playerFeedback(error.message || '播放地址暂时不可用', 'error');
     }
@@ -542,7 +639,10 @@
     state.canceledVersion = state.version;
     state.controller.abort();
     destroyPlayer();
-    app.innerHTML = errorState('已取消当前请求', { title: '加载已取消' });
+    app.innerHTML = errorState('已取消当前请求', {
+      title: '加载已取消',
+      back: state.route?.name === 'detail',
+    });
     finishRoute({ message: '已取消当前请求' });
   }
 
@@ -555,6 +655,7 @@
     app.setAttribute('aria-busy', 'true');
     const version = state.version;
     const next = parseHash();
+    reconcileDetailNavigation(next);
     state.route = next;
     renderNav();
     if (!state.navReady) {
@@ -608,12 +709,12 @@
     }
     if (target?.closest('[data-detail-back]')) {
       event.preventDefault();
-      history.length > 1 ? history.back() : (location.hash = linkTo({ name: 'home', siteId: state.route?.siteId || 'ja', page: 1 }));
+      returnFromDetail();
       return;
     }
     if (target?.closest('[data-player-cancel]')) {
       event.preventDefault();
-      state.playerController?.abort();
+      destroyPlayer();
       playerFeedback('已取消播放解析', 'error');
       return;
     }
@@ -621,7 +722,11 @@
       event.preventDefault();
       attachPlayer(state.currentDetail.post.playUrl, state.currentDetail.post.coverUrl);
     }
-    if (target?.closest('a[data-link]')) setDrawer(false, { restoreFocus: false });
+    const link = target?.closest('a[data-link]');
+    if (link) {
+      if (link.matches('.content-card')) rememberListView(link);
+      setDrawer(false, { restoreFocus: false });
+    }
   });
 
   window.addEventListener('hashchange', route);
