@@ -236,7 +236,7 @@ function publicImageAllowed(url) {
   if (!url) return false;
   if (/^data:image\//.test(url)) return true;
   if (/^\/api\/[a-z0-9-]+\/(image|cover|proxy)\b/.test(url)) return true;
-  return /^https:\/\/(?:[a-z0-9.-]+\.)?(?:imgclh\.com|avstatic\.com|cdn202511\.com|18j2026\.com|jb-aiwei\.cc|cfnav\.com|bestjavporn\.com|vdcdn\.xyz|pianopic\.com|streamhls\.click|streamtape\.net|tapecontent\.net|cloudatacdn\.com)(?:[/?#]|$)/i.test(url);
+  return /^https:\/\/(?:[a-z0-9.-]+\.)?(?:imgclh\.com|avstatic\.com|cdn20\d{4}\.com|18j2026\.com|jb-aiwei\.cc|cfnav\.com|bestjavporn\.com|vdcdn\.xyz|pianopic\.com|streamhls\.click|streamtape\.net|tapecontent\.net|cloudatacdn\.com)(?:[/?#]|$)/i.test(url);
 }
 
 module.exports = { SITES, findSite, publicImageAllowed };
