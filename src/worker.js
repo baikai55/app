@@ -25,6 +25,13 @@ const json = (data, status = 200, cache = 'no-store') =>
 
 const htmlHeaders = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' };
 
+function assetHeaders(asset, contentType, cacheControl) {
+  const headers = new Headers(asset.headers);
+  headers.set('Content-Type', contentType);
+  headers.set('Cache-Control', cacheControl);
+  return headers;
+}
+
 async function upstream(site, url, { method = 'GET', headers = {}, referer, allowHtml = false } = {}) {
   const res = await fetch(url, {
     method,
@@ -292,11 +299,7 @@ export default {
       if (path === '/sw.js') {
         return new Response(asset.body, {
           status: asset.status,
-          headers: {
-            ...Object.fromEntries(asset.headers),
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Content-Type': 'application/javascript; charset=utf-8',
-          },
+          headers: assetHeaders(asset, 'application/javascript; charset=utf-8', 'no-cache, no-store, must-revalidate'),
         });
       }
       if (path === '/' || path === '/index.html') {
@@ -307,11 +310,7 @@ export default {
           .replace(/(\/js\/app\.js)(\?v=[^"']*)?/g, `/js/app.js?v=${version}`);
         return new Response(patched, {
           status: asset.status,
-          headers: {
-            ...Object.fromEntries(asset.headers),
-            'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-          },
+          headers: assetHeaders(asset, 'text/html; charset=utf-8', 'no-cache, no-store, must-revalidate'),
         });
       }
       return asset;

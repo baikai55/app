@@ -1,0 +1,26 @@
+{
+	"version": 1,
+	"ports": {
+		"preview": 3000,
+		"additional": {}
+	},
+	"scripts": {
+		"setup": {
+			"enabled": true,
+			"command": null
+		},
+		"run": {
+			"enabled": true,
+			"command": "npx --yes wrangler@4.128.0 dev --local --no-live-reload --port 3000"
+		},
+		"archive": {
+			"enabled": true,
+			"command": null
+		},
+		"check": {
+			"enabled": true,
+			"command": null
+		}
+	},
+	"mcpServers": []
+}
