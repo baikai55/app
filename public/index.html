@@ -26,16 +26,16 @@
           <span class="brand-mark" aria-hidden="true">91</span>
           <span class="brand-name">看聚合</span>
         </a>
-        <button class="icon-button menu-button" id="menuBtn" type="button" aria-label="打开分类" title="分类">
+        <button class="icon-button menu-button" id="menuBtn" type="button" aria-label="打开分类" aria-controls="drawer" aria-expanded="false" title="分类">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
         </button>
       </div>
-      <nav class="category-nav" id="quickNav" aria-label="分类导航"><nav class="quick-categories" aria-label="快捷分类"><a class="nav-item active" href="#/" data-link="">全部</a></nav></nav>
+      <nav class="category-nav" id="quickNav" aria-label="站点导航"><a class="nav-item active" href="#/" data-link="">全部</a></nav>
     </header>
 
-    <aside class="drawer" id="drawer" aria-hidden="true">
+    <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" aria-hidden="true" inert>
       <div class="drawer-head">
-        <strong>分类</strong>
+        <strong id="drawerTitle">分类</strong>
         <button class="icon-button" id="drawerClose" type="button" aria-label="关闭分类" title="关闭">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"></path></svg>
         </button>
@@ -49,9 +49,9 @@
         <nav class="drawer-list" id="catNav" aria-label="频道分类"></nav>
       </section>
     </aside>
-    <div class="drawer-mask" id="drawerMask" hidden=""></div>
+    <div class="drawer-mask" id="drawerMask" aria-hidden="true" hidden=""></div>
 
-    <main class="main" id="app" aria-live="polite"><header class="page-head"><div><h1>最新更新</h1><span class="page-meta">浏览目录</span></div></header><nav class="quick-categories" aria-label="快捷分类"><a class="nav-item active" href="#/" data-link="">全部</a></nav><section class="content-grid skeleton-grid" aria-hidden="true">
+    <main class="main" id="app" tabindex="-1" aria-busy="true"><header class="page-head"><div><h1>最新更新</h1><span class="page-meta">浏览目录</span></div></header><nav class="quick-categories" aria-label="快捷分类"><a class="nav-item active" href="#/" data-link="">全部</a></nav><section class="content-grid skeleton-grid" aria-hidden="true">
       <div class="skeleton-card"><div class="skeleton-media"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
       <div class="skeleton-card"><div class="skeleton-media"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
       <div class="skeleton-card"><div class="skeleton-media"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
@@ -64,4 +64,6 @@
       <div class="skeleton-card"><div class="skeleton-media"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
       <div class="skeleton-card"><div class="skeleton-media"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
       <div class="skeleton-card"><div class="skeleton-media"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></section><div class="inline-state loading-state"><span class="loader" aria-hidden="true"></span><span>加载中</span><button type="button" class="button" data-cancel-route="">取消</button></div></main>
+    <div class="sr-only" id="routeStatus" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div class="sr-only" id="routeAlert" role="alert" aria-live="assertive" aria-atomic="true"></div>
   </div></body></html>
